@@ -1,5 +1,9 @@
 # Enhanced CUDA-Accelerated OCR Pipeline for Printed English Text
 
+# Issues
+- [ ] some issue with preprocessed image, too much noise, bottom is blacked. check the sample.png and preprocessed_sample.png
+- [ ] tried to use texture memory for blurring, median flitering but failed, so removed it. should try later
+
 # Plan of Action:
 
 - [x] Create Logger
@@ -19,74 +23,79 @@
 - Utilize NVIDIA Performance Primitives (NPP) for efficient image processing (==later if required==)
 - Implement parameter tuning for each step (e.g., kernel size, thresholds)
 1. **Color to Grayscale Conversion**
-   - [ ] Average method
-   - [ ] Luminosity Method
-   - [ ] Desaturation Method  
+   - [x] Average method
+   - [x] Luminosity Method
+   - [x] Desaturation Method  
 2. **Image Denoising**
-   - Apply Gaussian blur or median filter
+   - [x] Apply Gaussian blur
+   - [x] median filter
 3. **Contrast Enhancement**
-   - Implement adaptive histogram equalization
+   - [x] Implement adaptive histogram equalization
+   - [x] Implement CLAHE
 4. **Binarization**
-   - Apply Otsu's thresholding or adaptive thresholding
+   - [ ] Implement Otsu's thresholding 
+   - [ ] Implement adaptive thresholding
 
 ## 3. Page Layout Analysis (GPU)
-- Use cuCIM library for faster processing
-- Implement methods to handle various document layouts (e.g., multi-column)
+- [ ] Use cuCIM library for faster processing (==Optional==)
+- [ ] Implement methods to handle various document layouts (e.g., multi-column) (==for later==)
 1. **Skew Detection and Correction**
+   - [ ] Calculate the skew and correct the rotation
 2. **Document Structure Analysis**
-   - Identify text blocks, images, tables, etc.
+   - [ ] Identify text blocks, images, tables, etc.
 
 ## 4. Text Line Detection (GPU)
 1. **Advanced Morphological Operations**
-   - Handle diverse fonts and text sizes
+   - [ ] Handle diverse fonts and text sizes
 2. **Connected Component Analysis**
+   - [ ] Implement the CCA
 3. **Text Line Extraction**
-   - Group connected components into text lines
-- Investigate deep learning-based approaches for more accurate detection
+   - [ ] Group connected components into text lines
+- [ ] Investigate deep learning-based approaches for more accurate detection(==later==)
 
 ## 5. Word Segmentation (GPU)
 1. **Inter-word Space Detection**
-   - Implement edge detection methods
+   - [ ] Implement edge detection methods
 2. **Word Bounding Box Extraction**
-   - Use DBSCAN clustering for better word grouping
+   - [ ] Use DBSCAN clustering for better word grouping
 
 ## 6. Character Segmentation (GPU)
 1. **Vertical Projection Analysis**
 2. **Character Bounding Box Extraction**
-- Implement techniques to handle touching or overlapping characters
+- [ ] Implement techniques to handle touching or overlapping characters
 
 ## 7. Feature Extraction (GPU)
 1. **Character Normalization**
-   - Resize and center each character
+   - [ ] Resize and center each character
 2. **Feature Computation**
-   - Experiment with various techniques (e.g., HOG, pixel intensity patterns)
-   - Ensure robustness to font style and size variations
+   - [ ] Experiment with various techniques (e.g., HOG, pixel intensity patterns)
+   - [ ] Ensure robustness to font style and size variations
 
 ## 8. Character Recognition (GPU with cuDNN)
-- Evaluate different models (CNN, LSTM) for optimal accuracy and speed
-- Use transfer learning with pre-trained models
-- Implement model quantization for faster inference
+- [ ] Evaluate different models (CNN, LSTM) for optimal accuracy and speed
+- [ ] Use transfer learning with pre-trained models
+- [ ] Implement model quantization for faster inference
 
 ## 9. Post-processing
 1. **Language Model Application** (GPU/CPU)
-   - Use advanced models like BERT or GPT for context understanding
+   - [ ] Use advanced models like BERT or GPT for context understanding
 2. **Word Formation and Validation**
 3. **Text Line Formation**
-- Implement a feedback loop to refine earlier stages based on language model output
+- [ ] Implement a feedback loop to refine earlier stages based on language model output
 
 ## 10. Output Generation
 1. **Text Formatting**
-   - Match original layout
+   - [ ] Match original layout
 2. **Result Visualization**
-   - Highlight recognized text on the original image
+   - [ ] Highlight recognized text on the original image
 3. **Multi-format Output**
-   - Support various formats (e.g., JSON, PDF) with metadata
+   - [ ] Support various formats (e.g., JSON, PDF) with metadata
 
 ## 11. Quality Assurance
 1. **Confidence Scoring**
 2. **Error Detection and Correction**
 3. **User Feedback Mechanism**
-   - Continuously improve OCR accuracy based on corrections
+   - [ ] Continuously improve OCR accuracy based on corrections
 
 ## 12. User Interface (Optional)
 1. **Responsive Input Interface**
@@ -109,6 +118,11 @@
 ## To run the program:
 
 clone the repo
+```
+gh repo clone agirishkumar/CudaOCR
 cd CudaOCR
 make
 ./app
+```
+
+**This project is making me go crazy... fucked my sleep cycle 🥲.. but its fun!!**
