@@ -19,6 +19,9 @@
 - Utilize NVIDIA Performance Primitives (NPP) for efficient image processing (==later if required==)
 - Implement parameter tuning for each step (e.g., kernel size, thresholds)
 1. **Color to Grayscale Conversion**
+   - [ ] Average method
+   - [ ] Luminosity Method
+   - [ ] Desaturation Method  
 2. **Image Denoising**
    - Apply Gaussian blur or median filter
 3. **Contrast Enhancement**
