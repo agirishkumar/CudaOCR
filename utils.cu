@@ -36,9 +36,9 @@ void Logger::log(LogLevel level, const std::string& message, const char* file, i
            << file << ":" << line << " - " 
            << message << std::endl;
 
-        std::cout << ss.str(); // Print to console
-        logFile << ss.str();   // Write to file
-        logFile.flush();       // Ensure it's written immediately
+        std::cout << ss.str(); 
+        logFile << ss.str();   
+        logFile.flush();       // Ensures it's written immediately
     }
 }
 

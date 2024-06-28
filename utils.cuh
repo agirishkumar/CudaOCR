@@ -28,8 +28,13 @@ public:
     static void close();
 };
 
-#define LOG(level, message) Logger::log(level, message, __FILE__, __LINE__)
-
+#define LOG(level, message) \
+    do { \
+        std::ostringstream oss; \
+        oss << message; \
+        Logger::log(level, oss.str(), __FILE__, __LINE__); \
+    } while(0)
+    
 // CUDA error checking
 #define CHECK_CUDA_ERROR(call) \
 do { \
@@ -41,5 +46,65 @@ do { \
         exit(EXIT_FAILURE); \
     } \
 } while(0)
+
+// CUDA error checking macro
+#define CUDA_SAFE_CALL(call) \
+do { \
+    cudaError_t err = call; \
+    if (cudaSuccess != err) { \
+        std::stringstream ss; \
+        ss << "CUDA error in " << __FILE__ << " line " << __LINE__ << ": " \
+           << cudaGetErrorString(err); \
+        LOG(ERROR, ss.str()); \
+        throw std::runtime_error(ss.str()); \
+    } \
+} while(0)
+
+// Wrapper for cudaMalloc with error checking
+inline void* safeCudaMalloc(size_t size) {
+    void* ptr;
+    CUDA_SAFE_CALL(cudaMalloc(&ptr, size));
+    return ptr;
+}
+
+// Wrapper for cudaFree with error checking
+inline void safeCudaFree(void* ptr) {
+    if (ptr) {
+        CUDA_SAFE_CALL(cudaFree(ptr));
+    }
+}
+
+// CUDA Timer class
+class CudaTimer {
+private:
+    cudaEvent_t start, stop;
+    float elapsedTime;
+
+public:
+    CudaTimer() {
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+    }
+
+    ~CudaTimer() {
+        cudaEventDestroy(start);
+        cudaEventDestroy(stop);
+    }
+
+    void Start() {
+        cudaEventRecord(start, 0);
+    }
+
+    void Stop() {
+        cudaEventRecord(stop, 0);
+        cudaEventSynchronize(stop);
+        cudaEventElapsedTime(&elapsedTime, start, stop);
+    }
+
+    float ElapsedMilliseconds() const {
+        return elapsedTime;
+    }
+};
+
 
 // Other utility functions...
