@@ -1,0 +1,32 @@
+[2024-06-28 00:33:45] [INFO] main.cu:12 - OCR process started
+[2024-06-28 00:33:45] [INFO] main.cu:24 - Image upload check passed
+[2024-06-28 00:33:46] [INFO] main.cu:29 - Image loaded and transferred to GPU memory successfully
+[2024-06-28 00:33:46] [INFO] main.cu:36 - GPU memory check passed
+[2024-06-28 00:33:46] [WARNING] checks.cu:63 - Image is too blurry. Variance: 25.878404
+[2024-06-28 00:33:46] [ERROR] main.cu:39 - Image quality check failed
+[2024-06-28 00:36:14] [INFO] main.cu:12 - OCR process started
+[2024-06-28 00:36:14] [INFO] main.cu:24 - Image upload check passed
+[2024-06-28 00:36:14] [INFO] main.cu:29 - Image loaded and transferred to GPU memory successfully
+[2024-06-28 00:36:14] [INFO] main.cu:36 - GPU memory check passed
+[2024-06-28 00:36:14] [WARNING] checks.cu:63 - Image is too blurry. Variance: 25.878404
+[2024-06-28 00:36:14] [ERROR] main.cu:39 - Image quality check failed
+[2024-06-28 00:36:40] [INFO] main.cu:12 - OCR process started
+[2024-06-28 00:36:40] [INFO] main.cu:24 - Image upload check passed
+[2024-06-28 00:36:41] [INFO] main.cu:29 - Image loaded and transferred to GPU memory successfully
+[2024-06-28 00:36:41] [INFO] main.cu:36 - GPU memory check passed
+[2024-06-28 00:36:41] [WARNING] checks.cu:74 - Image brightness is not within acceptable range. Mean: 229.397180
+[2024-06-28 00:36:41] [ERROR] main.cu:39 - Image quality check failed
+[2024-06-28 00:38:08] [INFO] main.cu:12 - OCR process started
+[2024-06-28 00:38:08] [INFO] main.cu:24 - Image upload check passed
+[2024-06-28 00:38:08] [INFO] main.cu:29 - Image loaded and transferred to GPU memory successfully
+[2024-06-28 00:38:08] [INFO] main.cu:36 - GPU memory check passed
+[2024-06-28 00:38:08] [INFO] checks.cu:83 - Image quality check passed
+[2024-06-28 00:38:08] [INFO] main.cu:42 - Image quality check passed
+[2024-06-28 00:38:08] [INFO] main.cu:46 - OCR process completed successfully
+[2024-06-28 00:39:32] [INFO] main.cu:12 - OCR process started
+[2024-06-28 00:39:32] [INFO] main.cu:24 - Image upload check passed
+[2024-06-28 00:39:33] [INFO] main.cu:29 - Image loaded and transferred to GPU memory successfully
+[2024-06-28 00:39:33] [INFO] main.cu:36 - GPU memory check passed
+[2024-06-28 00:39:33] [INFO] checks.cu:83 - Image quality check passed
+[2024-06-28 00:39:33] [INFO] main.cu:42 - Image quality check passed
+[2024-06-28 00:39:33] [INFO] main.cu:46 - OCR process completed successfully

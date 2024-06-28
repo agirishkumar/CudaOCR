@@ -1,42 +1,51 @@
-CC=g++-9
-NVCC=nvcc
+CC := g++-9
+NVCC := nvcc
 
-# Use pkg-config to get OpenCV flags
-OPENCV_CFLAGS=$(shell pkg-config --cflags opencv4)
-OPENCV_LIBS=$(shell pkg-config --libs opencv4)
+# OpenCV configuration
+OPENCV_CFLAGS := $(shell pkg-config --cflags opencv4)
+OPENCV_LIBS := $(shell pkg-config --libs opencv4)
 
-# CUDA runtime library
-CUDA_LIBS=-lcudart
+# CUDA paths and flags
+CUDA_PATH := /usr/local/cuda
+CUDA_INCLUDE := -I$(CUDA_PATH)/include
+CUDA_LIBS := -L$(CUDA_PATH)/lib64 -lcudart -lcuda
 
-# Define C++ standard and any other compiler flags
-CXXFLAGS=-std=c++14
+# Compiler flags
+CXXFLAGS := -std=c++14 -O3 -fopenmp -w $(OPENCV_CFLAGS)
+NVCCFLAGS := -std=c++14 -O3 -arch=sm_61 -w $(OPENCV_CFLAGS)
 
-# NVCC flags: specify the host compiler and pass the necessary OpenCV compiler flags
-NVCCFLAGS=-ccbin $(CC) $(OPENCV_CFLAGS) -Xcompiler "$(CXXFLAGS)"
+# Include directories
+INCLUDES := -I. $(CUDA_INCLUDE)
 
-# Linker flags: Link both CUDA and OpenCV libraries
-LDFLAGS=$(CUDA_LIBS) $(OPENCV_LIBS) -L/usr/local/cuda/lib64
+# Source files
+CUDA_SRCS := $(wildcard *.cu)
+CPP_SRCS := $(wildcard *.cpp)
 
-TARGET=app
-CUDA_SRC=imageprocessing.cu
-CPP_SRC=segmentation.cpp  # Assuming the segmentation function is here
+# Object files
+CUDA_OBJS := $(CUDA_SRCS:.cu=.o)
+CPP_OBJS := $(CPP_SRCS:.cpp=.o)
+OBJS := $(CUDA_OBJS) $(CPP_OBJS)
 
-OBJ_FILES=imageprocessing.o segmentation.o
+# Executable name
+TARGET := app
 
 # Default target
 all: $(TARGET)
 
-# Target for the application
-$(TARGET): $(OBJ_FILES)
-	$(CC) -o $@ $^ $(LDFLAGS)
+# Link the target
+$(TARGET): $(OBJS)
+	$(NVCC) $(NVCCFLAGS) $^ -o $@ $(CUDA_LIBS) $(OPENCV_LIBS)
 
-# Compile CUDA source to object files
-imageprocessing.o: $(CUDA_SRC)
-	$(NVCC) $(NVCCFLAGS) -c $< -o $@
+# Compile CUDA source files
+%.o: %.cu
+	$(NVCC) $(NVCCFLAGS) $(INCLUDES) -c $< -o $@
 
-# Compile C++ source to object files
-segmentation.o: $(CPP_SRC)
-	$(CC) $(OPENCV_CFLAGS) $(CXXFLAGS) -c $< -o $@
+# Compile C++ source files
+%.o: %.cpp
+	$(CC) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
 
+# Clean up
 clean:
-	rm -f $(TARGET) $(OBJ_FILES)
+	rm -f $(TARGET) $(OBJS)
+
+.PHONY: all clean
