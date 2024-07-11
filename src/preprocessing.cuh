@@ -11,4 +11,6 @@ bool convertToGrayscaleNPP(const cv::cuda::GpuMat& inputImage, cv::cuda::GpuMat&
 bool denoiseImageNPPGaussianBlur(const cv::cuda::GpuMat& inputImage, cv::cuda::GpuMat& outputImage, int kernelSize = 3);
 bool denoiseImageNPPMedianFilter(const cv::cuda::GpuMat& inputImage, cv::cuda::GpuMat& outputImage, int kernelSize );
 bool adaptiveThresholdOpenCV(const cv::cuda::GpuMat& inputImage, cv::cuda::GpuMat& outputImage, int blockSize, double C);
+
+
 #endif // PREPROCESSING_CUH
