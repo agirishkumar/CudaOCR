@@ -1,0 +1,5 @@
+src/preprocessing.cu(156): error: no suitable conversion function from "cv::cuda::GpuMat" to "double" exists
+          cv::cuda::threshold(inputImage, outputImage, diff, 255, cv::THRESH_BINARY);
+                                                       ^
+
+1 error detected in the compilation of "src/preprocessing.cu".
