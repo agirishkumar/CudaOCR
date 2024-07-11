@@ -1,0 +1,44 @@
+2024-07-11 18:17:24 [INFO] OCR Application started
+2024-07-11 18:17:26 [DEBUG] GpuMat Input image on GPU: rows=921, cols=699, type=16, channels=3, elem_size=3
+2024-07-11 18:17:26 [INFO] Starting grayscale conversion
+2024-07-11 18:17:26 [DEBUG] GpuMat Grayscale image: rows=921, cols=699, type=0, channels=1, elem_size=1
+2024-07-11 18:17:26 [INFO] Starting denoising
+2024-07-11 18:17:26 [DEBUG] GpuMat Denoised image: rows=921, cols=699, type=0, channels=1, elem_size=1
+2024-07-11 18:17:26 [INFO] Starting binarization
+2024-07-11 18:17:26 [DEBUG] GpuMat Binary image: rows=921, cols=699, type=0, channels=1, elem_size=1
+2024-07-11 18:17:26 [INFO] Starting page layout analysis
+2024-07-11 18:17:26 [DEBUG] GpuMat Input image for page layout analysis: rows=921, cols=699, type=0, channels=1, elem_size=1
+2024-07-11 18:17:26 [INFO] Starting skew angle detection
+2024-07-11 18:17:26 [DEBUG] Image dimensions: 699x921, Rho: 2312, Theta: 180
+2024-07-11 18:17:26 [DEBUG] Launching Hough transform kernel
+2024-07-11 18:17:26 [ERROR] CUDA synchronization error: an illegal memory access was encountered
+2024-07-11 18:21:36 [INFO] OCR Application started
+2024-07-11 18:21:38 [DEBUG] GpuMat Input image on GPU: rows=921, cols=699, type=16, channels=3, elem_size=3
+2024-07-11 18:21:38 [INFO] Starting grayscale conversion
+2024-07-11 18:21:38 [DEBUG] GpuMat Grayscale image: rows=921, cols=699, type=0, channels=1, elem_size=1
+2024-07-11 18:21:38 [INFO] Starting denoising
+2024-07-11 18:21:38 [DEBUG] GpuMat Denoised image: rows=921, cols=699, type=0, channels=1, elem_size=1
+2024-07-11 18:21:38 [INFO] Starting binarization
+2024-07-11 18:21:38 [DEBUG] GpuMat Binary image: rows=921, cols=699, type=0, channels=1, elem_size=1
+2024-07-11 18:21:38 [INFO] Starting page layout analysis
+2024-07-11 18:21:38 [DEBUG] GpuMat Input image for page layout analysis: rows=921, cols=699, type=0, channels=1, elem_size=1
+2024-07-11 18:21:38 [INFO] Starting skew angle detection
+2024-07-11 18:21:38 [DEBUG] Image dimensions: 699x921, Rho: 2312, Theta: 180
+2024-07-11 18:21:38 [DEBUG] Launching Hough transform kernel
+2024-07-11 18:21:38 [ERROR] CUDA synchronization error: an illegal memory access was encountered
+2024-07-11 18:21:38 [INFO] Starting skew correction, angle: 0.000000
+2024-07-11 18:37:12 [INFO] OCR Application started
+2024-07-11 18:37:14 [DEBUG] GpuMat Input image on GPU: rows=921, cols=699, type=16, channels=3, elem_size=3
+2024-07-11 18:37:14 [INFO] Starting grayscale conversion
+2024-07-11 18:37:14 [DEBUG] GpuMat Grayscale image: rows=921, cols=699, type=0, channels=1, elem_size=1
+2024-07-11 18:37:14 [INFO] Starting denoising
+2024-07-11 18:37:14 [DEBUG] GpuMat Denoised image: rows=921, cols=699, type=0, channels=1, elem_size=1
+2024-07-11 18:37:14 [INFO] Starting binarization
+2024-07-11 18:37:14 [DEBUG] GpuMat Binary image: rows=921, cols=699, type=0, channels=1, elem_size=1
+2024-07-11 18:37:14 [INFO] Starting page layout analysis
+2024-07-11 18:37:14 [DEBUG] GpuMat Input image for page layout analysis: rows=921, cols=699, type=0, channels=1, elem_size=1
+2024-07-11 18:37:14 [INFO] Starting skew angle detection
+2024-07-11 18:37:14 [DEBUG] Image dimensions: 699x921, Rho: 2312, Theta: 180
+2024-07-11 18:37:14 [DEBUG] Launching Hough transform kernel
+2024-07-11 18:37:14 [ERROR] CUDA synchronization error: an illegal memory access was encountered
+2024-07-11 18:37:14 [INFO] Starting skew correction, angle: 0.000000
