@@ -138,7 +138,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    Logger::init("cudaocr.log");
+    // Only litter a log file when explicitly debugging; warnings/errors hit stderr anyway.
+    if (level <= LogLevel::Debug) Logger::init("cudaocr.log");
     Logger::setLevel(level);
     Logger::log(LogLevel::Info, "processing " + input);
 
