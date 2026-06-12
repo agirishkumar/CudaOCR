@@ -1,128 +1,60 @@
-# Enhanced CUDA-Accelerated OCR Pipeline for Printed English Text
+# CudaOCR
 
-# Issues
-- [ ] some issue with preprocessed image, too much noise, bottom is blacked. check the sample.png and preprocessed_sample.png
-- [ ] tried to use texture memory for blurring, median flitering but failed, so removed it. should try later
+A GPU-first OCR engine written from scratch in CUDA/C++. Every pipeline stage —
+grayscale, denoising, binarization, deskew, and segmentation — runs as a
+hand-written CUDA kernel, each verified byte-for-byte (or within a documented
+tolerance) against a CPU oracle by the test suite. Libraries (NPP) appear only
+as benchmark baselines.
 
-# Plan of Action:
+See [product.md](product.md) for the vision/roadmap, [architecture.md](architecture.md)
+for design decisions, and [BACKLOG.md](BACKLOG.md) for the task queue.
 
-- [x] Create Logger
-- [x] Create Log file
-- [X] Create Makefile
-- [x] Organize the project file structure
-- [x] Supress the warnings
+## Pipeline
 
-## 1. Image Acquisition
-- [x] Load image from file or capture from camera
-- [x] Transfer image to GPU memory
-- [x] Implement robust error handling for different image formats
-- [x] Add image quality assessment to filter out low-quality images early
-- [ ] Use CUDA streams for asynchronous data transfer when processing multiple images (==for later==)
-
-## 2. Preprocessing (GPU)
-- Utilize NVIDIA Performance Primitives (NPP) for efficient image processing (==later if required==)
-- Implement parameter tuning for each step (e.g., kernel size, thresholds)
-1. **Color to Grayscale Conversion**
-   - [x] Average method
-   - [x] Luminosity Method
-   - [x] Desaturation Method  
-2. **Image Denoising**
-   - [x] Apply Gaussian blur
-   - [x] median filter
-3. **Contrast Enhancement**
-   - [x] Implement adaptive histogram equalization
-   - [x] Implement CLAHE
-4. **Binarization**
-   - [ ] Implement Otsu's thresholding 
-   - [ ] Implement adaptive thresholding
-
-## 3. Page Layout Analysis (GPU)
-- [ ] Use cuCIM library for faster processing (==Optional==)
-- [ ] Implement methods to handle various document layouts (e.g., multi-column) (==for later==)
-1. **Skew Detection and Correction**
-   - [ ] Calculate the skew and correct the rotation
-2. **Document Structure Analysis**
-   - [ ] Identify text blocks, images, tables, etc.
-
-## 4. Text Line Detection (GPU)
-1. **Advanced Morphological Operations**
-   - [ ] Handle diverse fonts and text sizes
-2. **Connected Component Analysis**
-   - [ ] Implement the CCA
-3. **Text Line Extraction**
-   - [ ] Group connected components into text lines
-- [ ] Investigate deep learning-based approaches for more accurate detection(==later==)
-
-## 5. Word Segmentation (GPU)
-1. **Inter-word Space Detection**
-   - [ ] Implement edge detection methods
-2. **Word Bounding Box Extraction**
-   - [ ] Use DBSCAN clustering for better word grouping
-
-## 6. Character Segmentation (GPU)
-1. **Vertical Projection Analysis**
-2. **Character Bounding Box Extraction**
-- [ ] Implement techniques to handle touching or overlapping characters
-
-## 7. Feature Extraction (GPU)
-1. **Character Normalization**
-   - [ ] Resize and center each character
-2. **Feature Computation**
-   - [ ] Experiment with various techniques (e.g., HOG, pixel intensity patterns)
-   - [ ] Ensure robustness to font style and size variations
-
-## 8. Character Recognition (GPU with cuDNN)
-- [ ] Evaluate different models (CNN, LSTM) for optimal accuracy and speed
-- [ ] Use transfer learning with pre-trained models
-- [ ] Implement model quantization for faster inference
-
-## 9. Post-processing
-1. **Language Model Application** (GPU/CPU)
-   - [ ] Use advanced models like BERT or GPT for context understanding
-2. **Word Formation and Validation**
-3. **Text Line Formation**
-- [ ] Implement a feedback loop to refine earlier stages based on language model output
-
-## 10. Output Generation
-1. **Text Formatting**
-   - [ ] Match original layout
-2. **Result Visualization**
-   - [ ] Highlight recognized text on the original image
-3. **Multi-format Output**
-   - [ ] Support various formats (e.g., JSON, PDF) with metadata
-
-## 11. Quality Assurance
-1. **Confidence Scoring**
-2. **Error Detection and Correction**
-3. **User Feedback Mechanism**
-   - [ ] Continuously improve OCR accuracy based on corrections
-
-## 12. User Interface (Optional)
-1. **Responsive Input Interface**
-2. **Interactive Result Display**
-3. **Manual Correction Tools**
-4. **Accessibility Features**
-
-## Additional Considerations
-- **Benchmarking**: Continuously profile and benchmark each stage
-- **Parallelization**: Optimize pipeline to fully utilize GPU capabilities
-- **Modularization**: Develop each stage as an independent, easily updatable component
-- **Error Handling**: Implement robust error management throughout the pipeline
-- **Scalability**: Design the system to handle varying workloads efficiently
-- **Data Augmentation**: For training and testing, augment data to improve robustness
-- **Version Control**: Use Git for tracking changes and collaborating
-- **Documentation**: Maintain comprehensive documentation for each module
-- **Testing**: Implement unit tests and integration tests for each component
-
-
-## To run the program:
-
-clone the repo
 ```
-gh repo clone agirishkumar/CudaOCR
-cd CudaOCR
-make
-./app
+image ─► grayscale ─► median denoise ─► polarity normalize ─► adaptive/Otsu
+      binarization ─► Hough skew detect + GPU rotate ─► line/word/char
+      segmentation ─► JSON + overlay output        (recognition: roadmap M3/M4)
 ```
 
-**This project is making me go crazy... fucked my sleep cycle 🥲.. but its fun!!**
+## Requirements
+
+- CUDA Toolkit 12.4+ (developed on 13.1), GPU sm_75+ (default arch: 86)
+- CMake >= 3.24, a C++20 host compiler (g++-13)
+- No other system dependencies: image I/O is vendored (stb), GoogleTest is
+  fetched at configure time.
+
+## Build & test
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+ctest --test-dir build --output-on-failure   # 59 tests, all GPU kernels vs CPU oracles
+./scripts/verify.sh                          # full gate: build + tests + memcheck
+```
+
+## Run
+
+```bash
+./build/cudaocr resources/sample.png --benchmark -o out.json --dump-stages stages/
+```
+
+`--dump-stages` writes the intermediate images plus an overlay with detected
+lines (blue), words (red), and characters (green). See `./build/cudaocr --help`
+for thresholding/deskew options.
+
+Example on `resources/sample.png` (699x921 scan, RTX 3060 Laptop):
+35 lines, 348 words, 903 characters in **4.2 ms** of GPU pipeline time.
+
+## Benchmarks (`./build/bench`, 2500x3500, RTX 3060 Laptop, vs NPP)
+
+| kernel | custom | NPP | ratio |
+|---|---|---|---|
+| grayscale | 0.137 ms | 0.113 ms | 1.22x |
+| gaussian 5x5 | 0.792 ms | 0.288 ms | 2.75x |
+| median 5x5 | 19.6 ms | 0.715 ms | 27x (optimization task filed) |
+| box mean 31x31 | 2.45 ms | 19.0 ms | **0.13x — 7.8x faster than NPP** |
+
+## License
+
+MIT — see [LICENSE](LICENSE).
