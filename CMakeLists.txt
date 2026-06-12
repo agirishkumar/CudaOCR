@@ -37,6 +37,9 @@ set_target_properties(cudaocr_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 add_executable(cudaocr apps/cudaocr_cli/main.cpp)
 target_link_libraries(cudaocr PRIVATE cudaocr_lib)
 
+include(GNUInstallDirs)
+install(TARGETS cudaocr RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 # ---- tests ----
 include(FetchContent)
 FetchContent_Declare(
