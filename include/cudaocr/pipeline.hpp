@@ -27,9 +27,10 @@ struct PipelineConfig {
 
 // Intermediate images for --dump-stages / debugging.
 struct StageImages {
-    HostImage gray;      // after preprocessing
-    HostImage binary;    // after binarization
-    HostImage deskewed;  // binary after deskew (== binary when deskew is off)
+    HostImage gray;          // after preprocessing (polarity-normalized)
+    HostImage binary;        // after binarization
+    HostImage deskewed;      // binary after deskew (== binary when deskew is off)
+    HostImage deskewedGray;  // gray after deskew, same angle; what the recognizer reads
 };
 
 class Pipeline {

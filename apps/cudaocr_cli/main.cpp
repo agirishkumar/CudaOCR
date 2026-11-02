@@ -235,6 +235,7 @@ int main(int argc, char** argv) {
         save("01_gray.png", stages.gray);
         save("02_binary.png", stages.binary);
         save("03_deskewed.png", stages.deskewed);
+        save("05_deskewed_gray.png", stages.deskewedGray);
         // Overlay: deskewed binary as RGB with line bands (blue), words (red), chars (green).
         if (!stages.deskewed.empty()) {
             const HostImage& base = stages.deskewed;
