@@ -2,7 +2,7 @@
 
 Active milestone: M3 — batch M3.7–M3.11 on one branch (user request: single PR at the end)
 
-CURRENT: M3.8
+CURRENT: M3.9
 branch: task/M3.7-M3.11-functional-ocr
 pr: (none)
 attempts: 0
@@ -27,6 +27,7 @@ lastFailure: (none)
 - M3.5, 2026-11-02, "models: pinned PP-OCRv5 English recognizer fetch + model card (M3.5)" — PR #12 merged
 - M3.6, 2026-11-02, "stages: GPU line crop/resize/normalize for the recognizer (M3.6)" — PR #13 merged
 - M3.7, 2026-11-02, "components: CTC greedy decoder (M3.7)"
+- M3.8, 2026-11-02, "components: ONNX Runtime line recognizer (M3.8)"
 
 ## AWAITING-MERGE
 (none)

@@ -78,7 +78,7 @@ Active milestone: **M3** (MOD complete)
   *Accept:* max abs diff ≤ 1e-4 vs oracle on fixture lines; memcheck clean.
 - [x] **M3.7 CTC greedy decoder.** `CtcGreedyDecoder` implements `Decoder`: argmax per timestep, collapse repeats, drop blank, map via dictionary; confidence = mean max-prob of emitted chars; keeps per-char timestep for later word-box alignment.
   *Accept:* unit tests on hand-built logits (repeats, blanks between repeats, all-blank → empty, unknown index → error).
-- [ ] **M3.8 OnnxLineRecognizer.** Implements `LineRecognizer`; batches lines (configurable max batch/width), EP from params (`cuda`|`cpu`), session created once per Pipeline. Note (M3.4): create the `Ort::Env` before any `CreateCUDAProviderOptions` call. Note (M3.6): in a padded batch, decode only line n's first ⌊crops[n].outW / 8⌋ timesteps.
+- [x] **M3.8 OnnxLineRecognizer.** Implements `LineRecognizer`; batches lines (configurable max batch/width), EP from params (`cuda`|`cpu`), session created once per Pipeline. Note (M3.4): create the `Ort::Env` before any `CreateCUDAProviderOptions` call. Note (M3.6): in a padded batch, decode only line n's first ⌊crops[n].outW / 8⌋ timesteps.
   *Accept:* on a rendered single-line fixture ("The quick brown fox jumps over the lazy dog") greedy-decoded text matches exactly on both EPs; CPU and CUDA logits agree within 1e-3.
 - [ ] **M3.9 End-to-end text + txt formatter.** Wire recognizer+decoder into `Pipeline`; `TxtFormatter`; CLI prints text to stdout or `-o file.txt`; exit code 3 when no text.
   *Accept:* integration test — CER ≤ 5% on committed clean synthetic pages; `cudaocr resources/sample.png` exits 0 with non-empty output.

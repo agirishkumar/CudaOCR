@@ -38,6 +38,7 @@ add_library(cudaocr_lib STATIC
   src/components/projection_detector.cpp
   src/components/builtin.cpp
   src/components/ctc_greedy_decoder.cpp
+  src/components/charset.cpp
   src/eval/metrics.cpp
   src/pipeline.cu
 )
@@ -84,6 +85,15 @@ if(CUDAOCR_WITH_ORT)
   message(STATUS "ONNX Runtime: ${CUDAOCR_ORT_ROOT}")
 endif()
 
+# The ORT-backed recognizer is part of the library when ORT is enabled.
+if(CUDAOCR_WITH_ORT)
+  target_sources(cudaocr_lib PRIVATE src/components/onnx_line_recognizer.cpp)
+  target_link_libraries(cudaocr_lib PUBLIC onnxruntime::onnxruntime)
+  target_compile_definitions(cudaocr_lib PUBLIC CUDAOCR_WITH_ORT=1)
+endif()
+target_compile_definitions(cudaocr_lib PRIVATE
+  CUDAOCR_DEFAULT_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/models")
+
 # ---- tests ----
 FetchContent_Declare(
   googletest
@@ -122,7 +132,8 @@ add_executable(unit_tests
 )
 target_link_libraries(unit_tests PRIVATE cudaocr_lib gtest gtest_main)
 if(CUDAOCR_WITH_ORT)
-  target_sources(unit_tests PRIVATE tests/unit/ort_smoke_test.cpp tests/unit/rec_model_test.cpp)
+  target_sources(unit_tests PRIVATE tests/unit/ort_smoke_test.cpp tests/unit/rec_model_test.cpp
+                 tests/unit/onnx_recognizer_test.cpp)
   target_link_libraries(unit_tests PRIVATE onnxruntime::onnxruntime)
 endif()
 target_include_directories(unit_tests PRIVATE tests)
