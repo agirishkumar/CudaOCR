@@ -5,9 +5,10 @@ segmentation run as hand-written CUDA kernels, each verified byte-for-byte (or
 within a documented tolerance) against a CPU oracle by the test suite.
 Libraries (NPP) appear only as benchmark baselines.
 
-**Status (2026-11):** preprocessing + layout are done; **text recognition is
-not implemented yet** — the tool currently outputs line/word boxes, not text.
-Next: modular component interfaces, then recognition via ONNX Runtime (M3).
+**Status (2026-11):** end-to-end OCR works — GPU preprocessing, deskew and line
+detection, then PP-OCRv5 line recognition through ONNX Runtime (CUDA or CPU) and
+CTC decoding. Character error rate on the synthetic test pages is under 1%.
+Next: accuracy report and preprocessing tuning (M3), then JSON/hOCR/config (M4).
 Goal: a functional, modular OCR whose parts can be swapped or optimized later —
 not a state-of-the-art competitor.
 
@@ -46,8 +47,14 @@ ctest --test-dir build --output-on-failure   # 60 tests, all GPU kernels vs CPU 
 ## Run
 
 ```bash
-./build/cudaocr resources/sample.png --benchmark -o out.json --dump-stages stages/
+./scripts/fetch_models.sh                      # once: recognition model (7.8 MB) into models/
+./build/cudaocr page.png                       # recognized text on stdout
+./build/cudaocr page.png -o page.json          # boxes + text + confidences as JSON
+./build/cudaocr page.png -v --benchmark --dump-stages stages/   # diagnostics on stderr
+./build/cudaocr page.png --no-recognize -o boxes.json           # detection only, no model
 ```
+
+Exit codes: 0 text found, 1 bad input/config, 2 GPU/runtime error, 3 no text found.
 
 Score OCR output against ground truth (CER/WER over Unicode code points, whitespace-normalized):
 

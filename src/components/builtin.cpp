@@ -5,6 +5,7 @@
 #endif
 #include "cudaocr/components/preprocess.hpp"
 #include "cudaocr/components/projection_detector.hpp"
+#include "cudaocr/components/txt_formatter.hpp"
 #include "cudaocr/registry.hpp"
 
 namespace cudaocr {
@@ -35,6 +36,7 @@ ComponentRegistry ComponentRegistry::withBuiltins() {
     (void)r.add<Deskewer>("hough", factoryOf<HoughDeskewer, Deskewer>());
     (void)r.add<TextDetector>("projection", factoryOf<ProjectionDetector, TextDetector>());
     (void)r.add<Decoder>("ctc-greedy", factoryOf<CtcGreedyDecoder, Decoder>());
+    (void)r.add<Formatter>("txt", factoryOf<TxtFormatter, Formatter>());
 #ifdef CUDAOCR_WITH_ORT
     (void)r.add<LineRecognizer>("onnx", factoryOf<OnnxLineRecognizer, LineRecognizer>());
 #endif
