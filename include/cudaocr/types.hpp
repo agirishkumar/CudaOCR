@@ -4,6 +4,7 @@
 // so formatters, the CLI and tests can use them from plain C++ TUs.
 
 #include <algorithm>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -52,6 +53,8 @@ struct PageResult {
     bool inverted = false;          // input was light-on-dark and got normalized
     std::vector<LineResult> lines;  // reading order
     std::vector<StageTime> timings;
+    // Scalars reported by components, keyed "<component>.<metric>" (e.g. "otsu.threshold").
+    std::map<std::string, double> metrics;
 
     // Line texts joined with '\n'.
     std::string text() const {

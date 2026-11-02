@@ -72,7 +72,7 @@ class AdaptiveBinarizer final : public ImageStage {
     int blockSize_, C_;
 };
 
-// "otsu": global Otsu threshold.
+// "otsu": global Otsu threshold; recorded as page->metrics["otsu.threshold"].
 class OtsuBinarizer final : public ImageStage {
   public:
     static Result<std::unique_ptr<OtsuBinarizer>> create(const Params& p);

@@ -20,7 +20,7 @@ class DeviceImage {
     DeviceImage& operator=(DeviceImage&& other) noexcept;
 
     static Result<DeviceImage> create(int width, int height, int channels);
-    static Result<DeviceImage> fromHost(const HostImage& host);
+    static Result<DeviceImage> fromHost(const HostImage& host, cudaStream_t stream = nullptr);
 
     // Keeps the allocation if the shape already matches, otherwise (re)allocates.
     // Contents are unspecified afterwards.
@@ -28,8 +28,10 @@ class DeviceImage {
     // Device-to-device copy into `dst` (allocated/reshaped as needed).
     Status copyTo(DeviceImage& dst, cudaStream_t stream = nullptr) const;
 
-    Status upload(const HostImage& host);
-    Status download(HostImage& host) const;
+    // Ordered on `stream` (pipeline streams are non-blocking, so the default
+    // stream would race their kernels); both return once the copy completed.
+    Status upload(const HostImage& host, cudaStream_t stream = nullptr);
+    Status download(HostImage& host, cudaStream_t stream = nullptr) const;
 
     std::uint8_t* data() { return data_; }
     const std::uint8_t* data() const { return data_; }

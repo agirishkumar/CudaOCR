@@ -35,21 +35,30 @@ class DeviceBuffer {
         return buf;
     }
 
-    Status zero() {
-        CUDAOCR_CHECK(cudaMemset(data_, 0, size_ * sizeof(T)));
+    // All transfers/fills are ordered on the caller's stream. Pipeline streams are
+    // non-blocking, so default-stream operations would NOT be ordered with their
+    // kernels (regression: tests/unit/stream_ordering_test.cu).
+    Status zero(cudaStream_t stream = nullptr) {
+        CUDAOCR_CHECK(cudaMemsetAsync(data_, 0, size_ * sizeof(T), stream));
         return Status::Good();
     }
 
-    Status upload(const std::vector<T>& host) {
+    // Returns once the copy has completed (host memory is pageable).
+    Status upload(const std::vector<T>& host, cudaStream_t stream = nullptr) {
         if (host.size() != size_)
             return Status::Error(ErrorCode::InvalidArgument, "DeviceBuffer::upload size mismatch");
-        CUDAOCR_CHECK(cudaMemcpy(data_, host.data(), size_ * sizeof(T), cudaMemcpyHostToDevice));
+        CUDAOCR_CHECK(
+            cudaMemcpyAsync(data_, host.data(), size_ * sizeof(T), cudaMemcpyHostToDevice, stream));
+        CUDAOCR_CHECK(cudaStreamSynchronize(stream));
         return Status::Good();
     }
 
-    Status download(std::vector<T>& host) const {
+    // Waits for prior work on `stream`, then copies.
+    Status download(std::vector<T>& host, cudaStream_t stream = nullptr) const {
         host.resize(size_);
-        CUDAOCR_CHECK(cudaMemcpy(host.data(), data_, size_ * sizeof(T), cudaMemcpyDeviceToHost));
+        CUDAOCR_CHECK(
+            cudaMemcpyAsync(host.data(), data_, size_ * sizeof(T), cudaMemcpyDeviceToHost, stream));
+        CUDAOCR_CHECK(cudaStreamSynchronize(stream));
         return Status::Good();
     }
 

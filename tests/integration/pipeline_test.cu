@@ -2,7 +2,7 @@
 
 #include <cmath>
 
-#include "cudaocr/pipeline.hpp"
+#include "cudaocr/legacy_pipeline.hpp"
 #include "oracles/oracles.hpp"
 
 namespace cudaocr {
@@ -13,11 +13,11 @@ TEST(Pipeline, EndToEndOnSkewedSyntheticPage) {
     const float trueAngle = 2.5f;
     const HostImage skewed = oracle::rotate(page.image, trueAngle, 255);
 
-    PipelineConfig cfg;
+    LegacyPipelineConfig cfg;
     cfg.medianK = 0;  // synthetic page is noise-free; keep glyph edges crisp
-    auto res = runPipeline(skewed, cfg, /*keepStages=*/true);
+    auto res = runLegacyPipeline(skewed, cfg, /*keepStages=*/true);
     ASSERT_TRUE(res.ok()) << res.status().message;
-    const PipelineResult& r = res.value();
+    const LegacyPipelineResult& r = res.value();
 
     EXPECT_NEAR(r.skewAngleDeg, trueAngle, 0.5f);
     ASSERT_EQ(static_cast<int>(r.lines.size()), page.lineCount);
@@ -33,10 +33,10 @@ TEST(Pipeline, EndToEndOnSkewedSyntheticPage) {
 TEST(Pipeline, HandlesInvertedInput) {
     const auto page = oracle::makeSyntheticPage();
     const HostImage inverted = oracle::invert(page.image);
-    PipelineConfig cfg;
+    LegacyPipelineConfig cfg;
     cfg.medianK = 0;
     cfg.deskew = false;
-    auto res = runPipeline(inverted, cfg);
+    auto res = runLegacyPipeline(inverted, cfg);
     ASSERT_TRUE(res.ok()) << res.status().message;
     EXPECT_TRUE(res.value().wasInverted);
     EXPECT_EQ(static_cast<int>(res.value().lines.size()), page.lineCount);
@@ -44,11 +44,11 @@ TEST(Pipeline, HandlesInvertedInput) {
 
 TEST(Pipeline, OtsuVariantWorks) {
     const auto page = oracle::makeSyntheticPage();
-    PipelineConfig cfg;
+    LegacyPipelineConfig cfg;
     cfg.useOtsu = true;
     cfg.medianK = 0;
     cfg.deskew = false;
-    auto res = runPipeline(page.image, cfg);
+    auto res = runLegacyPipeline(page.image, cfg);
     ASSERT_TRUE(res.ok()) << res.status().message;
     EXPECT_GE(res.value().otsuThreshold, 0);
     EXPECT_EQ(static_cast<int>(res.value().lines.size()), page.lineCount);
@@ -57,13 +57,13 @@ TEST(Pipeline, OtsuVariantWorks) {
 TEST(Pipeline, RunsOnRealSampleFixture) {
     auto img = loadImage(std::string(CUDAOCR_FIXTURE_DIR) + "/sample.png");
     ASSERT_TRUE(img.ok()) << img.status().message;
-    auto res = runPipeline(img.value(), PipelineConfig{});
+    auto res = runLegacyPipeline(img.value(), LegacyPipelineConfig{});
     ASSERT_TRUE(res.ok()) << res.status().message;
     EXPECT_GE(res.value().lines.size(), 1u);  // real scan: at least one text line
 }
 
 TEST(Pipeline, RejectsEmptyInput) {
-    EXPECT_FALSE(runPipeline(HostImage{}, PipelineConfig{}).ok());
+    EXPECT_FALSE(runLegacyPipeline(HostImage{}, LegacyPipelineConfig{}).ok());
 }
 
 }  // namespace
