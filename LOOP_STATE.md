@@ -18,7 +18,7 @@ lastFailure: (none)
 - MOD.1, 2026-11-02, "types: add host-only page/line/word result types (MOD.1)"
 
 ## AWAITING-MERGE
-(none)
+- PR #3 https://github.com/agirishkumar/CudaOCR/pull/3 (task/MOD.1-result-types)
 
 ## BLOCKED
 (none)
