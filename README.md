@@ -1,12 +1,17 @@
 # CudaOCR
 
-A GPU-first OCR engine written from scratch in CUDA/C++. Every pipeline stage —
-grayscale, denoising, binarization, deskew, and segmentation — runs as a
-hand-written CUDA kernel, each verified byte-for-byte (or within a documented
-tolerance) against a CPU oracle by the test suite. Libraries (NPP) appear only
-as benchmark baselines.
+A GPU-first OCR engine written in CUDA/C++. Preprocessing, deskew, and
+segmentation run as hand-written CUDA kernels, each verified byte-for-byte (or
+within a documented tolerance) against a CPU oracle by the test suite.
+Libraries (NPP) appear only as benchmark baselines.
 
-See [product.md](product.md) for the vision/roadmap, [architecture.md](architecture.md)
+**Status (2026-11):** preprocessing + layout are done; **text recognition is
+not implemented yet** — the tool currently outputs line/word boxes, not text.
+Next: modular component interfaces, then recognition via ONNX Runtime (M3).
+Goal: a functional, modular OCR whose parts can be swapped or optimized later —
+not a state-of-the-art competitor.
+
+See [product.md](product.md) for the vision, status, roadmap and evaluation data, [architecture.md](architecture.md)
 for design decisions, and [BACKLOG.md](BACKLOG.md) for the task queue.
 
 ## Pipeline
@@ -14,20 +19,20 @@ for design decisions, and [BACKLOG.md](BACKLOG.md) for the task queue.
 ```
 image ─► grayscale ─► median denoise ─► polarity normalize ─► adaptive/Otsu
       binarization ─► Hough skew detect + GPU rotate ─► line/word/char
-      segmentation ─► JSON + overlay output        (recognition: roadmap M3/M4)
+      segmentation ─► JSON + overlay output        (recognition: roadmap M3, custom kernels M5)
 ```
 
 ## Requirements
 
-- CUDA Toolkit 12.4+ (developed on 13.1), GPU sm_75+ (default arch: 86)
-- CMake >= 3.24, a C++20 host compiler (g++-13)
+- CUDA Toolkit 13.x (developed on 13.1/13.4), GPU sm_75+ (default arch: 86)
+- CMake >= 3.24, a C++20 host compiler (developed with g++ 13 and 15)
 - No other system dependencies: image I/O is vendored (stb), GoogleTest is
   fetched at configure time.
 
 ## Build & test
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=86  # explicit arch until W.1 lands
 cmake --build build -j
 ctest --test-dir build --output-on-failure   # 59 tests, all GPU kernels vs CPU oracles
 ./scripts/verify.sh                          # full gate: build + tests + memcheck

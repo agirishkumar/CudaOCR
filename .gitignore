@@ -3,3 +3,7 @@ output/
 *.o
 *.log
 .cache/
+
+# Local Claude Code config (not part of the project)
+.claude/
+CLAUDE.md
