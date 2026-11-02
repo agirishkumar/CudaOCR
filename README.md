@@ -57,6 +57,14 @@ ctest --test-dir build --output-on-failure   # 60 tests, all GPU kernels vs CPU 
 
 Exit codes: 0 text found, 1 bad input/config, 2 GPU/runtime error, 3 no text found.
 
+Configure the pipeline with a TOML file ([docs/config.md](docs/config.md)); explicit flags
+override it. Output formats: [docs/output-formats.md](docs/output-formats.md) (txt, JSON, hOCR).
+
+```bash
+./build/cudaocr --print-config > my.toml      # edit, then:
+./build/cudaocr --config my.toml page.png
+```
+
 Accuracy report over all fixture sets (writes `benchmarks/ACCURACY.md`):
 
 ```bash
