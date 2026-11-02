@@ -1,49 +1,110 @@
-# BACKLOG — ordered task queue for loop engineering
+# BACKLOG — ordered task queue
 
-Rules: tasks are executed top-to-bottom within the active milestone, one per loop iteration.
-A task is checked off only when its acceptance criteria pass via `scripts/verify.sh` and the work is committed.
-Acceptance criteria must be machine-checkable. Add/split tasks freely; never reorder a checked task.
+Rules
+- Tasks run top-to-bottom within the active milestone, **one task = one branch = one PR** (workflow: architecture.md §13).
+- A task is checked off (in its own PR) only when its acceptance criteria pass via `scripts/verify.sh`.
+- Acceptance criteria must be machine-checkable. Add/split tasks freely; never reorder or delete a checked task.
+- Unchecked tasks may be moved between milestones; leave a "→ moved to" note.
 
-Active milestone: **M2** (M0, M1 complete 2026-06-11)
+Active milestone: **W** → then **MOD** → **M3**
 
-## M0 — Re-foundation (build + test harness)
+## M0 — Re-foundation ✅ (2026-06-11)
 
-- [x] **M0.1 CMake skeleton + GoogleTest.** Create CMakeLists.txt (CUDA 13.1, C++20, arch 86 cache var, `-Wall -Wextra`), FetchContent GoogleTest, empty `cudaocr` static lib + `unit_tests` target with one trivial failing test; make it pass.
-  *Accept:* `cmake -B build && cmake --build build -j && ctest --test-dir build` → 1/1 pass.
-- [x] **M0.2 scripts/verify.sh.** Implement the verification gate (build, ctest, conditional memcheck on changed .cu, clang-format check) + `.clang-format`.
-  *Accept:* `./scripts/verify.sh` exits 0 on clean tree; exits non-zero when a test is deliberately broken (verified once, then reverted).
-- [x] **M0.3 Status/Result + CUDA_CHECK.** `include/cudaocr/core/status.hpp` with ErrorCode, Status, Result<T>, CUDA_CHECK macro. Unit tests for message formatting and macro behavior (mockable via a failing cudaMalloc size).
-  *Accept:* tests cover Ok path, CUDA error path with file:line in message.
-- [x] **M0.4 Logger v2.** Port existing Logger: add mutex, TRACE/WARN levels, `<sstream>` fix, stderr mirror ≥ WARN, injectable sink for tests. Thread-safety test (N threads × M messages, no interleaving corruption).
-  *Accept:* logger tests pass incl. concurrency test.
-- [x] **M0.5 core RAII wrappers.** `Stream`, `DeviceBuffer<T>`, `DeviceImage` (pitched, move-only, async upload/download with pinned staging). Tests: alloc/move/upload-download roundtrip byte-exact; memcheck clean.
-  *Accept:* roundtrip test green + memcheck 0 errors.
-- [x] **M0.6 Grayscale kernel (first oracle-TDD kernel).** CPU oracle (BT.601) in tests/oracles; `grayscaleKernel` grid-stride on DeviceImage. Replaces NPP path.
-  *Accept:* byte-exact vs oracle on synthetic ramp + `resources/sample.png`.
-- [x] **M0.7 CLI skeleton.** `apps/cudaocr_cli`: arg parsing (input path, `-o`, `--dump-stages`, `--log-level`), loads image via OpenCV CPU, runs load→grayscale→save. Integration test runs the binary on sample.png and checks output exists & matches golden.
-  *Accept:* integration test green; `./build/apps/cudaocr resources/sample.png --dump-stages out/` produces grayscale image.
-- [x] **M0.8 Legacy teardown.** Delete Makefile, `dev/`, duplicate/unused includes, commented-out blocks, `using namespace std`; move remaining legacy .cu logic into a `legacy/` reference folder or delete where superseded. README updated to new build instructions.
-  *Accept:* build green, ctest green, `grep -r "using namespace std" src include apps` empty.
+- [x] **M0.1 CMake skeleton + GoogleTest.**
+- [x] **M0.2 scripts/verify.sh.**
+- [x] **M0.3 Status/Result + CUDA_CHECK.**
+- [x] **M0.4 Logger v2.**
+- [x] **M0.5 core RAII wrappers.**
+- [x] **M0.6 Grayscale kernel (first oracle-TDD kernel).**
+- [x] **M0.7 CLI skeleton.**
+- [x] **M0.8 Legacy teardown.**
 
-## M1 — Preprocessing custom kernels (each task = oracle + kernel + benchmark)
+## M1 — Preprocessing custom kernels ✅ (2026-06-11)
 
-- [x] **M1.1 Box-filter / integral image kernel** (foundation for adaptive threshold). Oracle: OpenCV CPU `boxFilter`. *Accept:* max abs diff ≤ 1 vs oracle.
-- [x] **M1.2 Adaptive mean threshold kernel** (params blockSize, C; uses M1.1). Regression vs current behavior on fixtures. *Accept:* byte-exact vs oracle.
-- [x] **M1.3 Otsu binarization** (GPU 256-bin histogram + host argmax). *Accept:* threshold value == oracle's on 5 fixtures.
-- [x] **M1.4 Median filter 3×3/5×5 kernel** (shared-memory tiles). Oracle: OpenCV CPU `medianBlur`. *Accept:* byte-exact.
-- [x] **M1.5 Separable Gaussian kernel** (shared memory; sigma param). *Accept:* max abs diff ≤ 1 vs OpenCV CPU `GaussianBlur`.
-- [x] **M1.6 Histogram equalization kernel.** *Accept:* byte-exact vs oracle.
-- [x] **M1.7 Inversion detection + normalization.** *Accept:* property test — inverted fixture normalizes to same output as original.
-- [x] **M1.8 Benchmark harness** (google-benchmark): each M1 kernel vs NPP `_Ctx`/OpenCV-CPU equivalent; results table generated into `benchmarks/RESULTS.md`. *Accept:* table generated; each kernel within 2× of library baseline or a follow-up optimization task is filed.
-- [ ] **M1.9 Median filter optimization** (currently 27× slower than NPP, see benchmarks/RESULTS.md): shared-memory tiles + sorting network for 3×3; histogram or network approach for 5×5. *Accept:* byte-exact tests stay green; ≤2× of NPP in `./build/bench`.
-- [ ] **M1.10 Gaussian optimization** (currently 2.75× of NPP): shared-memory tile per block for both passes. *Accept:* byte-exact tests stay green; ≤2× of NPP.
+- [x] **M1.1 Box-filter / integral image kernel.**
+- [x] **M1.2 Adaptive mean threshold kernel.**
+- [x] **M1.3 Otsu binarization.**
+- [x] **M1.4 Median filter 3×3/5×5 kernel.**
+- [x] **M1.5 Separable Gaussian kernel.**
+- [x] **M1.6 Histogram equalization kernel.**
+- [x] **M1.7 Inversion detection + normalization.**
+- [x] **M1.8 Benchmark harness** → `benchmarks/RESULTS.md`.
+- M1.9 Median optimization → moved to M6.1
+- M1.10 Gaussian optimization → moved to M6.2
 
-## M2 — Layout & segmentation (expand when M1 nears completion)
+## M2 — Layout & segmentation ✅ (2026-06-11)
 
-- [x] **M2.1 Hough skew detection — fixed.** Regression test `HoughAccumulatorBoundsRegression` reproducing the old OOB (bounds `r < rho`), constant-memory sin/cos, θ window ±15°, oracle = CPU Hough. *Accept:* detected angle within 0.5° of known-skew synthetic fixtures; memcheck clean.
-- [x] **M2.2 GPU rotation kernel** (bilinear, replaces CPU warpAffine). *Accept:* max abs diff ≤ 2 vs OpenCV CPU `warpAffine` away from borders.
-- [x] **M2.3 Horizontal projection profile + line detection.** *Accept:* line count & boundaries match ground truth on 3 fixtures.
-- [x] **M2.4 Vertical profiles → word boxes.** *Accept:* word count matches ground truth fixtures.
-- [ ] **M2.5 Connected-component labeling (GPU union-find) → char boxes.** *Accept:* component count matches oracle (OpenCV CPU `connectedComponents`).
+- [x] **M2.1 Hough skew detection — fixed** (`HoughAccumulatorBoundsRegression`).
+- [x] **M2.2 GPU rotation kernel.**
+- [x] **M2.3 Horizontal projection profile + line detection.**
+- [x] **M2.4 Vertical profiles → word boxes.**
+- M2.5 GPU connected-component labeling → moved to M6.4 (not needed for line-level CTC recognition)
 
-## M3+ — defined in product.md §7; expand into tasks when M2 is underway.
+## W — Workflow fixes (do first; they unblock the gate)
+
+- [ ] **W.1 CUDA arch default regression.** Set the `CMAKE_CUDA_ARCHITECTURES` default *before* `project()` (cache-overridable). Add regression test `CudaArchMatchesDevice` asserting a library kernel's `cudaFuncAttributes.binaryVersion` equals the device's compute capability (i.e. native SASS present, no PTX JIT).
+  *Accept:* on a fresh `cmake -B build` (no `-D` flags) `ctest` → 100% pass on CUDA 13.4 + driver 13.2; `cuobjdump --list-elf build/libcudaocr_lib.a` shows `sm_86`; new test fails if arch is forced to 75.
+- [ ] **W.2 Branch-aware verify gate.** `verify.sh` computes changed files as `git diff --name-only $(git merge-base HEAD origin/main)` ∪ working tree, so memcheck/format run on everything the PR touches; add a `--full` flag (memcheck all tests regardless).
+  *Accept:* on a branch with a committed `.cu` change and clean tree, `verify.sh` runs memcheck and format on that file; on `main` with clean tree it skips them.
+
+## MOD — Modular core (no behavior change; makes every later task a drop-in)
+
+- [ ] **MOD.1 Result types.** `include/cudaocr/types.hpp` (host-only): `BBox`, `WordResult{box, text, conf}`, `LineResult{box, words, text, conf}`, `PageResult{lines, skewDeg, inverted, timings}`. Conversion from existing `TextLine`.
+  *Accept:* unit tests for construction/conversion; header compiles in a `.cpp` TU without nvcc.
+- [ ] **MOD.2 Component interfaces.** `include/cudaocr/components/`: `ImageStage` (DeviceImage→DeviceImage), `TextDetector` (binary DeviceImage→`vector<LineRegion>`), `LineRecognizer` (gray DeviceImage + regions → `Logits`), `Decoder` (`Logits`→text+conf), `Formatter` (`PageResult`→string). Each with `name()` and `Status`-returning methods; a `Params` key/value map type with typed getters + validation errors.
+  *Accept:* interface headers compile; `Params` unit tests (missing key → default, bad type → `InvalidArgument`).
+- [ ] **MOD.3 Wrap existing stages.** `GrayscaleStage`, `EqualizeStage`, `MedianStage`, `GaussianStage`, `PolarityStage`, `AdaptiveBinarizer`, `OtsuBinarizer`, `DeskewStage` (rotates both gray and binary with the same angle), `ProjectionDetector`. Thin adapters over existing kernels — kernels untouched.
+  *Accept:* per-adapter tests: output identical to calling the underlying free function.
+- [ ] **MOD.4 Registry + config-built Pipeline.** `ComponentRegistry` (name → factory); `PipelineConfig{preprocess: [ {name, params} ], binarizer, deskew, detector, recognizer?, decoder?, formatter}`; `Pipeline::create(cfg)` validates once; `Pipeline::run(HostImage) → PageResult` with per-component CUDA-event timing; CLI flags map onto the config.
+  *Accept:* golden-equivalence test — new `Pipeline` reproduces `runPipeline` lines/words/skew exactly on all existing pipeline fixtures; unknown component name → `InvalidArgument` naming it; then `runPipeline` is deleted and all tests stay green.
+
+## M3 — Functional OCR (text out)
+
+- [ ] **M3.1 Synthetic ground-truth fixtures.** `scripts/gen_fixtures.py` (Python + Pillow, seeded): renders pages/lines of known text with DejaVu/Liberation fonts at 300 DPI; variants: clean, skew ±5°, gaussian noise, inverted. Writes `*.png` + `*.gt.txt`. Commit a small set (≤ 2 MB) under `tests/fixtures/synth/`.
+  *Accept:* script is deterministic (same seed → identical bytes); existing segmentation finds the expected line count on the committed clean pages.
+- [ ] **M3.2 CER/WER evaluation module + tool.** `src/eval/` Levenshtein-based CER/WER (host C++), `cudaocr-eval <pred_dir> <gt_dir>` → per-file + aggregate table (markdown).
+  *Accept:* unit tests on known pairs (identical → 0, one substitution, insert/delete, empty strings, UTF-8 multi-byte).
+- [ ] **M3.3 Gray deskew path.** Pipeline keeps the deskewed gray image (same angle as binary) for recognition; `--dump-stages` writes it.
+  *Accept:* test — rotating gray and binary with the detected angle yields aligned images (binary of rotated gray ≈ rotated binary within documented tolerance).
+- [ ] **M3.4 ONNX Runtime dependency.** CMake option `CUDAOCR_WITH_ORT` (default ON): download prebuilt `onnxruntime-linux-x64-gpu_cuda13-<ver>.tgz` (≥1.27, SHA-256 pinned) via FetchContent; imported target; core lib still builds with it OFF.
+  *Accept:* smoke test runs a tiny committed ONNX model (e.g. Add/Identity) on CPU EP and CUDA EP and gets the expected output; `-DCUDAOCR_WITH_ORT=OFF` build + ctest green.
+- [ ] **M3.5 Model fetch + model card.** `scripts/fetch_models.sh` downloads PP-OCRv5 English `rec.onnx` + `dict.txt` into `models/` (gitignored), verifies SHA-256. Document in `models/README.md`: input name/shape/normalization, output shape, dictionary size + blank index, ONNX op list (sizes M5).
+  *Accept:* a test (skipped with a clear message if models absent) loads the model and asserts the documented I/O shapes.
+- [ ] **M3.6 Line crop + normalize kernel.** `LinePreprocessor`: crop each `LineRegion` from the deskewed gray image (with padding), bilinear-resize to model height keeping aspect, pad to batch max width, write float NCHW with the model's normalization. CPU oracle.
+  *Accept:* max abs diff ≤ 1e-4 vs oracle on fixture lines; memcheck clean.
+- [ ] **M3.7 CTC greedy decoder.** `CtcGreedyDecoder` implements `Decoder`: argmax per timestep, collapse repeats, drop blank, map via dictionary; confidence = mean max-prob of emitted chars; keeps per-char timestep for later word-box alignment.
+  *Accept:* unit tests on hand-built logits (repeats, blanks between repeats, all-blank → empty, unknown index → error).
+- [ ] **M3.8 OnnxLineRecognizer.** Implements `LineRecognizer`; batches lines (configurable max batch/width), EP from params (`cuda`|`cpu`), session created once per Pipeline.
+  *Accept:* on a rendered single-line fixture ("The quick brown fox jumps over the lazy dog") greedy-decoded text matches exactly on both EPs; CPU and CUDA logits agree within 1e-3.
+- [ ] **M3.9 End-to-end text + txt formatter.** Wire recognizer+decoder into `Pipeline`; `TxtFormatter`; CLI prints text to stdout or `-o file.txt`; exit code 3 when no text.
+  *Accept:* integration test — CER ≤ 5% on committed clean synthetic pages; `cudaocr resources/sample.png` exits 0 with non-empty output.
+- [ ] **M3.10 Accuracy baseline report.** Run eval on all synthetic variants + 1–2 hand-transcribed `resources/` pages; write `benchmarks/ACCURACY.md`; add a ratchet test that fails if clean-synthetic CER regresses by > 1 point.
+  *Accept:* report committed; ratchet test green.
+
+## M4 — Usable product
+
+- [ ] **M4.1 JSON formatter** (page → lines → words with boxes, text, confidences; schema documented). Word boxes from CTC timestep → x-coordinate mapping.
+- [ ] **M4.2 hOCR formatter** (validates as well-formed XHTML; `ocr_line`/`ocrx_word` with `bbox`).
+- [ ] **M4.3 TOML config** (toml++ via FetchContent): full `PipelineConfig` from file, CLI overrides on top; `--print-config`.
+- [ ] **M4.4 Multi-page input** (directory / multiple paths; reuse one Pipeline + ORT session; per-page outputs).
+- [ ] **M4.5 GitHub Actions CI** (CUDA toolkit container, compile-only build with `CUDAOCR_WITH_ORT=ON`, clang-format check, host-only tests).
+- [ ] **M4.6 Real-scan accuracy** (20–50 UNLV/ISRI pages via a fetch script, not committed) → table in `benchmarks/ACCURACY.md`; README results section.
+
+## M5 — Custom CUDA recognizer (ORT becomes the oracle)
+
+Expand into per-op tasks after M3.5 documents the model's op list. Expected shape:
+- [ ] M5.1 Weight loader (ONNX initializers → device buffers; BN folded into conv).
+- [ ] M5.2 Conv2d / depthwise conv kernels (implicit GEMM), oracle = ORT-CPU single-op models.
+- [ ] M5.3 Activations (hardswish, GELU/ReLU), layernorm, linear/matmul, softmax kernels.
+- [ ] M5.4 Attention block (if present in the model).
+- [ ] M5.5 `CudaLineRecognizer` assembling the graph; registered as `recognizer = "cuda"`.
+  *Accept (M5 overall):* logits within 1e-3 of ORT-CPU on fixtures; same decoded text; benchmark vs ORT CUDA EP.
+
+## M6 — Optimize & upgrade (swap-ins; none change the interfaces)
+
+- [ ] **M6.1 Median filter optimization** (was M1.9; 27× slower than NPP): shared-memory tiles + sorting network. *Accept:* byte-exact tests green; ≤ 2× NPP.
+- [ ] **M6.2 Gaussian optimization** (was M1.10; 2.75× NPP): shared-memory tiles. *Accept:* byte-exact; ≤ 2× NPP.
+- [ ] **M6.3 DBNet detector swap-in** (`detector = "dbnet-onnx"`, PP-OCRv5 det model): handles multi-column pages. *Accept:* reading-order-correct text on a 2-column synthetic fixture where `projection` fails.
+- [ ] **M6.4 GPU connected-component labeling** (was M2.5): union-find; char boxes for debug overlay. *Accept:* component count == CPU oracle.
+- [ ] **M6.5 CTC beam search + optional wordlist.**
+- [ ] **M6.6 Multi-stream batch throughput** for M4.4.

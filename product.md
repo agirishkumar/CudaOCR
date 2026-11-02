@@ -1,25 +1,27 @@
 # CudaOCR — Product Definition
 
 > Companion document: [architecture.md](architecture.md) (how we build it). This file defines **what** we build and **why**.
-> Status date: 2026-06-11.
+> Status date: 2026-11-02 (previous audit 2026-06-11).
 
 ## 1. Vision
 
-CudaOCR is a **GPU-first optical character recognition engine written from scratch in CUDA/C++**, where every stage of the classical OCR pipeline — preprocessing, layout analysis, segmentation, and recognition — runs on the GPU through hand-written CUDA kernels.
+CudaOCR is a **GPU-first optical character recognition engine written in CUDA/C++**: a CLI and linkable library that takes a printed-document image and emits the recognized text with positions and confidences.
 
-It is simultaneously:
+Priorities, in order:
 
-1. **A working product**: a CLI tool that takes a document image and emits the recognized text with positional metadata and confidence scores.
-2. **A learning & portfolio vehicle**: demonstrating mastery of CUDA kernel design, GPU memory management, streams, and performance engineering. Off-the-shelf GPU libraries (OpenCV CUDA, NPP) are used only as *benchmarks to beat*, not as the implementation.
+1. **Functional.** Image in, correct text out, on ordinary printed documents. A working end-to-end path beats a perfect half-pipeline.
+2. **Modular.** Every stage — preprocessing filters, binarizer, deskew, text detector, line recognizer, decoder, output formatter — sits behind a small interface and is selected by name from config. Any one of them can later be optimized, replaced (e.g. projection profiles → a learned detector), or re-implemented (ONNX Runtime → hand-written CUDA) without touching its neighbours.
+3. **Custom CUDA where it teaches something.** Hand-written kernels are the learning/portfolio goal; libraries (NPP, OpenCV, ONNX Runtime) are allowed as baselines, oracles, or temporary implementations behind an interface.
 
-**Guiding principle:** if a stage can be a custom kernel, it is a custom kernel. Library calls are temporary scaffolding or comparison baselines.
+**Non-goal: state of the art.** We are not competing with VLM-based OCR (Qwen-VL-class, GOT-OCR, olmOCR) or full document-understanding stacks. Target quality is "Tesseract-class on clean printed pages"; target strength is a fast, dependency-light, well-tested GPU pipeline whose parts can be swapped.
 
 ## 2. What CudaOCR is NOT
 
-- Not a Tesseract/PaddleOCR wrapper.
-- Not a general-purpose scene-text reader (street signs, memes). Scope is **printed document images**: scans, screenshots, PDFs rendered to images.
-- Not (initially) a handwriting recognizer.
-- Not a service/server. It is a CLI + linkable static library. (A server wrapper is a stretch goal.)
+- Not a Tesseract/PaddleOCR wrapper (though a PaddleOCR-trained *model* may run inside our pipeline — see §5 Stage 5).
+- Not a scene-text reader (street signs, photos of screens). Scope is **printed document images**: scans, screenshots, PDFs rendered to images.
+- Not a handwriting recognizer.
+- Not a service/server. CLI + static library. (Server wrapper is a stretch goal.)
+- Not a layout-understanding system (tables, math, forms → key/value) — out of scope for v1.
 
 ## 3. Users & use cases
 
@@ -29,131 +31,132 @@ It is simultaneously:
 | Developer integrating the lib | Batch-digitize printed documents on an NVIDIA GPU without heavyweight dependencies |
 | Recruiter/reviewer | Read clean, tested, benchmarked CUDA code |
 
-## 4. Current status (audited 2026-06-11)
+## 4. Current status (audited 2026-11-02)
 
-### 4.1 Done (works conceptually, but no longer compiles — see 4.3)
+### 4.1 Done
 
-| Stage | Implementation | Notes |
+| Area | What exists | Evidence |
 |---|---|---|
-| Image acquisition | `loadImageFromPath`, `uploadImageToGPU` (OpenCV) | Works |
-| Grayscale | `convertToGrayscaleNPP` (BT.601 coefficients) + OpenCV CUDA variant | Works |
-| Denoising | NPP median filter + NPP Gaussian (3/5/7) | Median called with kernelSize=1 (no-op) in main |
-| Binarization | Custom adaptive threshold via OpenCV CUDA box filter + compare | Hardcoded blockSize=3, C=2.0 |
-| Skew detection | Custom `houghTransform` CUDA kernel + accumulator argmax | **Crashes** (see 4.2) |
-| Skew correction | CPU `cv::warpAffine` | Defeats GPU purpose |
-| Logging | `Logger` static class, timestamped file log | Not thread-safe |
+| Build & harness (M0) | CMake + CUDA 13 + C++20, GoogleTest/CTest, `scripts/verify.sh` gate (build, tests, memcheck, clang-format), `Status`/`Result<T>`/`CUDA_CHECK`, thread-safe logger, RAII `DeviceBuffer`/`DeviceImage`/`Stream`, vendored stb image I/O, CLI. Legacy Makefile removed. | 59 tests |
+| Preprocessing (M1.1–M1.8) | Custom kernels: grayscale (BT.601), separable box mean, adaptive mean threshold, Otsu (GPU histogram), median 3×3/5×5, separable Gaussian, histogram equalization, polarity detection + invert. Each byte-exact (or documented tolerance) vs a hand-written CPU oracle. Benchmark harness vs NPP `_Ctx` → `benchmarks/RESULTS.md`. | grayscale 1.2× NPP; box mean **7.8× faster** than NPP |
+| Layout (M2.1–M2.4) | Hough skew detection (baseline-pixel voting, constant-memory trig, ±15° window, accumulator-bounds regression test), GPU bilinear rotation, row-projection line detection, column-projection word and char boxes. | 35 lines / 348 words on `resources/sample.png`, ~3.6 ms GPU total |
+| CLI | `cudaocr <img> [-o out.json] [--dump-stages dir] [--otsu] [--block-size] [--C] [--median] [--equalize] [--no-deskew] [--benchmark] [--log-level]`; JSON of boxes; overlay PNG; `install` target. | |
 
-### 4.2 Known bugs & issues (from code audit)
+### 4.2 Not done
 
-1. **Illegal memory access in `houghTransform`** (`src/page_analysis.cu`): the bounds check is `r >= 0 && r < rho * 2` but the accumulator is allocated with `rho * theta` ints and indexed `r * theta + t`. Any `r >= rho` writes out of bounds. This is the crash recorded in `ocr_pipeline.log`.
-2. **Output quality**: README reports excess noise and a blackened bottom region in preprocessed output (likely related to #1 and to the kernelSize=1 median call).
-3. `utils.cu` uses `std::stringstream` without `#include <sstream>`.
-4. Duplicated include block in `page_analysis.cu`; unused Thrust includes.
-5. `using namespace std;` in `main.cu`.
-6. No tests of any kind; no CI.
-7. All parameters hardcoded; no CLI argument parsing (input path baked into `config.h`).
-8. `downloadImageFromGPU` always returns true (no error handling).
-9. Texture-memory experiments failed and were removed (README) — revisit later as an optimization task.
+- **Recognition — the core of OCR.** The pipeline finds lines and words but cannot read them. No text is produced yet.
+- Text output formats (txt/hOCR), config file, accuracy measurement (no ground-truth harness, no CER/WER numbers).
+- Modular component interfaces: stages are free functions hard-wired in `runPipeline`; swapping an implementation means editing the pipeline.
+- Performance follow-ups: median is 27× slower than NPP (M1.9 → M6), Gaussian 2.75× (M1.10 → M6).
+- GPU connected-component labeling (M2.5 → M6; not needed for line-level recognition, see §5 Stage 4).
 
-### 4.3 Build is broken on current system (forced migration)
+### 4.3 Known bugs & issues
 
-- CUDA **13.1** removed every non-`_Ctx` NPP API the code calls (`nppiColorToGray_8u_C3C1R`, `nppiFilterGauss_8u_C1R`, `nppiFilterMedian_8u_C1R`, …).
-- CUDA 13 dropped `sm_61`; the GPU is an RTX 3060 Laptop (**sm_86**, 6 GB).
-- Makefile pins `g++-9`, which is not installed (g++-11/12/13 are).
-- OpenCV is not installed (no apt package, no source build, no CUDA modules).
-
-**Conclusion: the pipeline must be re-founded on the current toolchain. Decisions in architecture.md §3.**
+1. **CUDA arch default never applies (blocks all GPU tests on the current machine).** `CMakeLists.txt` sets `CMAKE_CUDA_ARCHITECTURES 86` *after* `project()`, by which point CMake has already defined it from the compiler default (75). Binaries contain sm_75 SASS + compute_75 PTX, so on the sm_86 GPU every kernel is PTX-JIT-compiled. Since the toolkit moved to 13.4 while the driver supports 13.2, JIT fails ("PTX was compiled with an unsupported toolchain") and 33/59 tests fail. Confirmed fix: configuring with `-DCMAKE_CUDA_ARCHITECTURES=86` → 59/59 pass. Backlog W.1.
+2. **`verify.sh` diffs against `HEAD`**, so on a task branch with committed work the memcheck/format steps see no changes. Must diff against the merge-base with `main`. Backlog W.2.
+3. **Character segmentation under-splits**: 903 chars / 348 words ≈ 2.6 chars/word on the sample (English averages ~4.7) — touching glyphs merge under the 1-blank-column rule. Low impact: line-level CTC recognition does not need char boxes.
+4. **Deskew only rotates the binary image.** A recognizer needs the deskewed *grayscale* image. Backlog M3.3.
+5. **Projection-profile layout assumes a single text column.** Multi-column pages, tables, and figures interleave lines. Accepted for v1; the `TextDetector` interface lets a learned detector (DBNet) replace it in M6.
+6. Toolchain drift since June: system now has CUDA toolkit 13.4 (13.1 also installed), driver 595.99 (CUDA 13.2), default host compiler g++ 15.2 (g++-13 removed). The build works with these once #1 is fixed.
 
 ## 5. Full product specification (features by pipeline stage)
 
-Each stage is a module with: a GPU implementation, a CPU **reference implementation (oracle)** used by tests, configurable parameters, and per-stage timing. Stage contracts (types, error model) are in architecture.md §6.
+Each stage is a **component** implementing a small interface (architecture.md §6), with: a GPU (or library) implementation, a CPU oracle used by tests where meaningful, parameters from config, and per-stage timing.
 
 ### Stage 0 — CLI & I/O
-- `cudaocr <input> [-o out.txt] [--format txt|json|hocr] [--dump-stages <dir>] [--config <toml>] [--log-level ...] [--benchmark]`
-- Load PNG/JPEG/TIFF/BMP via OpenCV `imread` (CPU); decode errors reported with file path and reason.
-- `--dump-stages` writes each intermediate image for visual debugging (replaces today's commented-out blocks in `main.cu`).
+- `cudaocr <input...> [-o out] [--format txt|json|hocr] [--config file.toml] [--dump-stages dir] [--log-level ...] [--benchmark]`
+- Load PNG/JPEG/BMP/TGA via vendored stb_image; decode errors reported with path and reason.
+- Directory or multiple inputs → one output per page (M4).
 - Exit codes: 0 success, 1 bad input, 2 GPU/runtime error, 3 no text found.
 
-### Stage 1 — Preprocessing (all custom kernels)
-| Feature | Detail |
-|---|---|
-| Grayscale | BT.601 weighted kernel (replaces NPP). Param: coefficient set. |
-| Denoise | Median 3×3/5×5 kernel; Gaussian (separable, shared-memory) kernel. Param: method, kernel size, sigma. |
-| Contrast | Global histogram equalization; CLAHE (tiled) as v1.1. |
-| Binarization | Adaptive mean threshold (integral-image based, so blockSize can be large); Otsu (GPU histogram + CPU argmax over 256 bins). Params: method, blockSize, C. |
-| Inversion detection | Decide dark-on-light vs light-on-dark from histogram; normalize to black text on white. |
+### Stage 1 — Preprocessing (`ImageStage` components, all custom kernels) — **done**
+Grayscale, equalize, median/Gaussian denoise, polarity normalization, adaptive/Otsu binarization. Configured as an ordered list.
 
-### Stage 2 — Page layout analysis
-| Feature | Detail |
-|---|---|
-| Skew detection | Fixed Hough kernel (correct accumulator bounds, cached sin/cos in constant memory, restricted θ range ±15° around horizontal for speed/robustness). Output: angle in degrees. |
-| Skew correction | **GPU** affine rotation kernel with bilinear sampling (replaces CPU `warpAffine`). |
-| Region/zone detection (v1.1) | Connected components / projection profiles to find text blocks vs whitespace; multi-column ordering. |
+### Stage 2 — Deskew (`ImageStage`) — **done for binary; gray path in M3.3**
+Hough skew estimate on the binary image; the same angle rotates both binary (for detection) and gray (for recognition).
 
-### Stage 3 — Text line detection
-- Horizontal projection-profile kernel (row-sum reduction) → valley detection → line boundaries.
-- Output: list of `LineBox {y0, y1, baseline}`.
-- Robust to ±0.5° residual skew.
+### Stage 3 — Text detection (`TextDetector`)
+- **v1 (done, to be wrapped):** `projection` — row projection → line bands; column projection → word boxes.
+- **M6 swap-in:** `dbnet-onnx` — PP-OCR detection model (DBNet) via ONNX Runtime; handles multi-column/complex layouts. Same output type.
+- Output: `std::vector<LineRegion>` (box, optional polygon, reading-order index).
 
 ### Stage 4 — Word & character segmentation
-- Per-line vertical projection profile → word gaps (gap threshold estimated from gap histogram).
-- Character segmentation: connected-component labeling (GPU union-find) within words; merge/split heuristics for touching characters.
-- Output: `WordBox`, `CharBox` hierarchies.
+- Word boxes come from the detector (projection gaps) and/or from CTC timestep positions after recognition.
+- Character boxes are **optional** (debug overlay only). GPU connected-component labeling is an M6 learning task, not on the functional path.
 
-### Stage 5 — Recognition (phased — see roadmap)
-- **Phase A (MVP)**: pretrained CRNN/CTC ONNX model executed via ONNX Runtime CUDA EP on cropped line images. Gets end-to-end text out quickly; establishes accuracy baseline.
-- **Phase B (the point of the project)**: replace ONNX Runtime with **hand-written inference kernels** (im2col/implicit GEMM conv, BiLSTM or conv-only recognizer, CTC greedy + beam decode) loading the same exported weights. Must match Phase A output within tolerance — Phase A becomes the oracle.
+### Stage 5 — Line recognition (`LineRecognizer` + `Decoder`)
+- **M3 (functional):** `onnx` recognizer running the **PP-OCRv5 English recognition model** (ONNX export, ~7.5 MB, CTC head + character dictionary file) through **ONNX Runtime ≥1.27** (`gpu_cuda13` build), execution provider selectable (`cuda` | `cpu`). Input: each line cropped from the deskewed gray image, resized to the model's input height (expected 48 — confirmed from the model in M3.2) with aspect kept, normalized, batched.
+- **M5 (custom):** `cuda` recognizer — hand-written kernels for the same model's ops (conv/depthwise conv with folded BN, hardswish, attention/matmul, layernorm, linear, softmax), loading the same weights. ORT-CPU logits are the oracle.
+- **Decoder:** CTC greedy (M3); beam search + optional wordlist (M6).
 
 ### Stage 6 — Post-processing
-- CTC decode → UTF-8 text assembly with line/word structure preserved.
-- Confidence per character/word/line (from softmax probabilities).
-- Optional dictionary correction (edit-distance ≤ 1 against a wordlist) — v1.2.
+- Assemble lines → page text in reading order; per-line/word confidence from softmax.
+- Optional dictionary correction (M6).
 
-### Stage 7 — Output formatting
-- `txt` (plain text), `json` (boxes + confidences), `hOCR` (HTML standard for OCR) — v1.1 for hOCR.
+### Stage 7 — Output (`Formatter`)
+- `txt` (M3), `json` with boxes + text + confidences (M4), `hocr` (M4).
 
-### Cross-cutting features
-- **Config file** (TOML) + CLI overrides for every stage parameter; no hardcoded constants.
-- **Per-stage GPU timing** (CUDA events) printed with `--benchmark`; comparison table vs OpenCV-CUDA/NPP equivalents where they exist.
-- **Thread-safe logging** with levels TRACE/DEBUG/INFO/WARN/ERROR.
-- **Deterministic mode** for tests (fixed seeds, synchronous execution).
+### Cross-cutting
+- **Component registry + config:** every component is created by name with a parameter map; config from TOML file + CLI overrides (M4). No hardcoded constants.
+- **Per-stage GPU timing** via CUDA events, printed with `--benchmark`.
+- **Thread-safe logging** TRACE…ERROR. **Deterministic mode** for tests.
+- **Accuracy harness:** CER/WER evaluation tool over a directory of image + ground-truth pairs (M3).
 
 ## 6. Non-functional requirements
 
 | Requirement | Target |
 |---|---|
-| Correctness | Every GPU kernel matches its CPU oracle: exact for integer ops, ≤1 ULP-equivalent tolerance for float paths (see architecture.md §8) |
-| Accuracy (end-to-end, MVP) | ≥90% character accuracy on clean 300-DPI printed scans (test set in `resources/` + generated set) |
-| Performance | ≤150 ms end-to-end for a 2500×3500 px page on RTX 3060 (excluding model warm-up); each custom kernel within 2× of NPP/OpenCV-CUDA equivalent, with a benchmark proving it |
-| Memory | Peak GPU memory ≤2 GB for a 4K-resolution page (6 GB card must never OOM) |
-| Reliability | No leaks (`compute-sanitizer --tool memcheck` clean); all CUDA errors surfaced with stage context |
-| Portability | Builds on any sm_75+ GPU with CUDA 12.4+ (arch flags configurable); primary target sm_86 |
+| Correctness | Every custom kernel matches its CPU oracle: byte-exact for integer/fixed-point ops, documented tolerance for float paths (architecture.md §8) |
+| Accuracy (M3) | **CER ≤ 5%** on the clean synthetic 300-DPI fixture set; non-empty, human-readable text on `resources/` scans. Numbers recorded in `benchmarks/ACCURACY.md`. |
+| Accuracy (M4+) | CER ≤ 10% on a small real-scan set (e.g. UNLV/ISRI-style pages, see §9) — measure first, then set a ratchet |
+| Performance | ≤ 150 ms end-to-end for a 2500×3500 page incl. recognition (ORT CUDA EP, excluding model load/warm-up) on RTX 3060 Laptop |
+| Memory | Peak GPU memory ≤ 2 GB for a 4K page (6 GB card must never OOM) |
+| Reliability | memcheck clean; all CUDA/ORT errors surfaced as `Status` with stage context |
+| Portability | Any sm_75+ GPU with CUDA 13.x; arch configurable; core library builds **without** ONNX Runtime (`CUDAOCR_WITH_ORT=OFF`) |
+| Modularity | Adding a new implementation of a component = new class + one registry line + tests; zero edits to `Pipeline` |
 
 ## 7. Roadmap & milestones
 
-**M0 — Re-foundation (build + test harness)**
-CMake build on CUDA 13.1/sm_86/g++-13, GoogleTest + CTest wired, CI-style `make check` target, logger made thread-safe, existing code migrated & compiling, Hough bug fixed under a regression test.
+Ordering principle: **functional end-to-end first, then usable, then custom/optimized.** Optimizations and swap-ins that don't change functionality are deferred to M6.
 
-**M1 — Preprocessing, custom & tested**
-All Stage-1 features as custom kernels with CPU oracles and benchmarks; NPP/OpenCV-CUDA usage removed from the pipeline (kept only in benchmark targets, if installed).
+| Milestone | Goal | Status |
+|---|---|---|
+| **M0** Re-foundation | CMake/CUDA 13/C++20 build, test harness, core RAII, logger, CLI | ✅ done |
+| **M1** Preprocessing | Custom preprocessing kernels + oracles + NPP benchmarks | ✅ done (M1.9/M1.10 perf → M6) |
+| **M2** Layout | Hough deskew, GPU rotate, projection line/word segmentation | ✅ done (M2.5 CCL → M6) |
+| **W** Workflow fixes | Fix CUDA arch default; branch-aware `verify.sh` | ⏳ next |
+| **MOD** Modular core | Result types, component interfaces, registry, Pipeline built from config; existing stages wrapped with zero behavior change | ⏳ |
+| **M3** Functional OCR | Ground-truth fixtures + CER tool, ORT dependency, line crop/normalize kernel, ONNX recognizer, CTC decoder, txt output, accuracy baseline | ⏳ |
+| **M4** Usable product | JSON/hOCR output, TOML config, multi-page input, GitHub Actions compile/format CI, README results tables | ⏳ |
+| **M5** Custom recognizer | Hand-written CUDA inference for the recognition model; ORT as oracle | ⏳ |
+| **M6** Optimize & upgrade | Median/Gaussian optimization, DBNet detector swap-in, GPU CCL, beam search, dictionary correction, multi-stream batching | backlog |
 
-**M2 — Layout & segmentation**
-GPU skew correct + line/word/char segmentation; visual debug overlays via `--dump-stages`.
-
-**M3 — MVP recognition (Phase A)**
-ONNX Runtime CUDA EP + pretrained CRNN; end-to-end text output; accuracy harness with ground-truth fixtures.
-
-**M4 — Custom recognition (Phase B)**
-Hand-written conv/GEMM/CTC kernels replacing ORT; Phase A output as oracle.
-
-**M5 — Productization**
-Config file, JSON/hOCR output, benchmark suite report, README with results table.
-
-**Stretch**: batch/multi-page throughput mode with streams, texture-memory filter variants (retry of the removed experiment), CLAHE, dictionary correction, Python bindings.
+Detailed, machine-checkable tasks live in [BACKLOG.md](BACKLOG.md).
 
 ## 8. Success metrics
 
-1. `ctest` green at every commit (TDD discipline — see architecture.md §8).
-2. Accuracy table in README: char/word accuracy per test image.
-3. Benchmark table: custom kernel vs library baseline, ms and speedup.
-4. End-to-end demo: `cudaocr resources/sample.png` prints correct text.
+1. `ctest` green and `verify.sh` passing on every merged PR.
+2. `cudaocr resources/sample.png` prints readable text (M3).
+3. Accuracy table (CER/WER per fixture set) in `benchmarks/ACCURACY.md` and README (M3/M4).
+4. Benchmark table: custom kernel vs library baseline (exists; extended per stage).
+5. Swap test: switching `detector`/`recognizer`/`binarizer` in config changes behavior without code edits (MOD/M4).
+
+## 9. Evaluation data & infrastructure
+
+### Data (in order of use)
+| Source | What | Use |
+|---|---|---|
+| **Synthetic (generated in-repo)** | `scripts/gen_fixtures.py` renders known text with system fonts (DejaVu, Liberation) via Pillow; optional skew, noise, blur, inversion, DPI | Primary TDD/CER fixtures: exact ground truth, deterministic seeds, no licensing issues. Small set committed; larger set generated on demand. |
+| `resources/` scans | 5 existing real images, no ground truth | Smoke tests ("produces non-empty readable text"); hand-transcribe 1–2 pages for a real-scan CER number |
+| **UNLV / ISRI dataset** | ~2,900 scanned printed pages (magazines, letters, reports) with ground-truth text; the set Tesseract was historically evaluated on | Real-scan accuracy in M4; use a 20–50 page subset, not committed |
+| FUNSD | 199 scanned forms with word boxes + text | Detection/word-box sanity on noisy scans (M4/M6) |
+| PubLayNet / DocLayNet | Layout annotations | Only if/when multi-column layout (M6) is attempted |
+
+### Models
+- **PP-OCRv5 English recognition** ONNX + `dict.txt` (Apache-2.0 PaddleOCR weights; community ONNX export on Hugging Face) — fetched by `scripts/fetch_models.sh` into `models/` (gitignored), SHA-256 pinned.
+- PP-OCRv5 detection (DBNet) ONNX — same source, for the M6 detector swap-in.
+
+### Compute / servers
+- **Local RTX 3060 Laptop (sm_86, 6 GB) is sufficient** for every milestone; no server is required.
+- **CI:** GitHub-hosted runners have no GPU. Plan (M4): a GitHub Actions job that installs the CUDA toolkit and does a compile-only build + clang-format check on every PR; GPU tests stay in `verify.sh` locally. Optional later: a self-hosted runner on this machine to run GPU tests on PRs.
+- **Optional:** rent a GPU by the hour (RunPod, Vast.ai, Lambda) only to check portability on another arch (sm_75/sm_89); a Hugging Face Space or Modal for a public demo is a stretch goal.
