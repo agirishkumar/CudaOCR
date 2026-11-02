@@ -4,6 +4,7 @@
 
 #include "cudaocr/pipeline.hpp"
 #include "oracles/oracles.hpp"
+#include "test_util.hpp"
 
 namespace cudaocr {
 namespace {
@@ -140,6 +141,46 @@ TEST(Pipeline, DeskewCanBeDisabled) {
     auto r = p.value().run(oracle::rotate(page.image, 3.0f, 255));
     ASSERT_TRUE(r.ok());
     EXPECT_EQ(r.value().skewDeg, 0.0f);
+}
+
+}  // namespace
+}  // namespace cudaocr
+
+namespace cudaocr {
+namespace {
+
+// M3.11: denoising that helps binarization (median) blurs thin gaps the
+// recognizer needs (doubled letters merged on sample.png), so binarizePrep
+// stages feed only the binarizer; the gray page the recognizer reads (and
+// StageImages::gray) skips them.
+TEST(Pipeline, BinarizePrepDoesNotTouchTheRecognizerGray) {
+    const auto page = oracle::makeSyntheticPage();
+    PipelineConfig cfg;
+    cfg.preprocess = {{"polarity", {}}};
+    cfg.binarizePrep = {{"median", Params().set("k", 5)}};
+    cfg.deskewer.reset();
+    auto p = Pipeline::create(cfg);
+    ASSERT_TRUE(p.ok()) << p.status().message;
+    const HostImage noisy = oracle::randomImage(page.image.width, page.image.height, 1, 3);
+    StageImages keep;
+    ASSERT_TRUE(p.value().run(noisy, &keep).ok());
+    EXPECT_TRUE(testutil::imagesEqual(keep.gray, noisy));  // polarity no-op, no median
+    EXPECT_TRUE(testutil::imagesEqual(keep.deskewedGray, noisy));
+    // ...while the binarizer did see the median-filtered page.
+    PipelineConfig noMedian = cfg;
+    noMedian.binarizePrep.clear();
+    auto q = Pipeline::create(noMedian);
+    StageImages keep2;
+    ASSERT_TRUE(q.value().run(noisy, &keep2).ok());
+    EXPECT_FALSE(testutil::imagesEqual(keep.binary, keep2.binary));
+}
+
+TEST(Pipeline, BinarizePrepErrorsNameTheSlot) {
+    PipelineConfig cfg;
+    cfg.binarizePrep = {{"median", Params().set("k", 4)}};
+    auto p = Pipeline::create(cfg);
+    ASSERT_FALSE(p.ok());
+    EXPECT_NE(p.status().message.find("binarizePrep[0]"), std::string::npos) << p.status().message;
 }
 
 }  // namespace

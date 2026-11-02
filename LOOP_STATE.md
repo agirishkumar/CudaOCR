@@ -1,9 +1,9 @@
 # LOOP_STATE — machine state for /engineer-step iterations
 
-Active milestone: M3 (next unchecked task: M3.7 CTC greedy decoder)
+Active milestone: M4 (M3 complete; M3.7–M3.11 shipped as one PR on user request)
 
 CURRENT: (none)
-branch: (none)
+branch: task/M3.7-M3.11-functional-ocr
 pr: (none)
 attempts: 0
 lastFailure: (none)
@@ -25,10 +25,15 @@ lastFailure: (none)
 - M3.3, 2026-11-02, "pipeline: deskew the gray page with the binary page's angle (M3.3)" — PR #10 merged
 - M3.4, 2026-11-02, "build: add pinned ONNX Runtime 1.31.1 (CUDA 13) dependency (M3.4)" — PR #11 merged
 - M3.5, 2026-11-02, "models: pinned PP-OCRv5 English recognizer fetch + model card (M3.5)" — PR #12 merged
-- M3.6, 2026-11-02, "stages: GPU line crop/resize/normalize for the recognizer (M3.6)"
+- M3.6, 2026-11-02, "stages: GPU line crop/resize/normalize for the recognizer (M3.6)" — PR #13 merged
+- M3.7, 2026-11-02, "components: CTC greedy decoder (M3.7)"
+- M3.8, 2026-11-02, "components: ONNX Runtime line recognizer (M3.8)"
+- M3.9, 2026-11-02, "pipeline: end-to-end text, txt formatter, CLI text output (M3.9)"
+- M3.10, 2026-11-02, "benchmarks: accuracy baseline, real-scan ground truth, ratchets; fix ORT exit crash (M3.10)"
+- M3.11, 2026-11-02, "pipeline: adaptive C 40 default, binarizePrep slot, new ratchets (M3.11)"
 
 ## AWAITING-MERGE
-- PR #13 https://github.com/agirishkumar/CudaOCR/pull/13 (task/M3.6-line-prep)
+- PR #14 https://github.com/agirishkumar/CudaOCR/pull/14 (task/M3.7-M3.11-functional-ocr)
 
 ## BLOCKED
 (none)

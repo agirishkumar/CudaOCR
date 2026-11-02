@@ -37,6 +37,9 @@ add_library(cudaocr_lib STATIC
   src/components/hough_deskewer.cpp
   src/components/projection_detector.cpp
   src/components/builtin.cpp
+  src/components/ctc_greedy_decoder.cpp
+  src/components/charset.cpp
+  src/components/txt_formatter.cpp
   src/eval/metrics.cpp
   src/pipeline.cu
 )
@@ -83,6 +86,15 @@ if(CUDAOCR_WITH_ORT)
   message(STATUS "ONNX Runtime: ${CUDAOCR_ORT_ROOT}")
 endif()
 
+# The ORT-backed recognizer is part of the library when ORT is enabled.
+if(CUDAOCR_WITH_ORT)
+  target_sources(cudaocr_lib PRIVATE src/components/onnx_line_recognizer.cpp)
+  target_link_libraries(cudaocr_lib PUBLIC onnxruntime::onnxruntime)
+  target_compile_definitions(cudaocr_lib PUBLIC CUDAOCR_WITH_ORT=1)
+endif()
+target_compile_definitions(cudaocr_lib PRIVATE
+  CUDAOCR_DEFAULT_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/models")
+
 # ---- tests ----
 FetchContent_Declare(
   googletest
@@ -102,6 +114,8 @@ add_executable(unit_tests
   tests/unit/params_test.cpp
   tests/unit/registry_test.cpp
   tests/unit/eval_test.cpp
+  tests/unit/ctc_decoder_test.cpp
+  tests/unit/txt_formatter_test.cpp
   tests/unit/components_test.cpp
   tests/unit/device_test.cu
   tests/unit/stream_ordering_test.cu
@@ -120,7 +134,9 @@ add_executable(unit_tests
 )
 target_link_libraries(unit_tests PRIVATE cudaocr_lib gtest gtest_main)
 if(CUDAOCR_WITH_ORT)
-  target_sources(unit_tests PRIVATE tests/unit/ort_smoke_test.cpp tests/unit/rec_model_test.cpp)
+  target_sources(unit_tests PRIVATE tests/unit/ort_smoke_test.cpp tests/unit/rec_model_test.cpp
+                 tests/unit/onnx_recognizer_test.cpp
+                 tests/integration/ocr_end_to_end_test.cpp)
   target_link_libraries(unit_tests PRIVATE onnxruntime::onnxruntime)
 endif()
 target_include_directories(unit_tests PRIVATE tests)
@@ -136,17 +152,19 @@ set_target_properties(unit_tests PROPERTIES
 include(GoogleTest)
 gtest_discover_tests(unit_tests DISCOVERY_TIMEOUT 60)
 
-# CLI smoke tests: pin the end-to-end counts on the real sample scan
-# (same numbers as PipelineGolden, through argument parsing and printing).
-add_test(NAME Cli.SampleDefault COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png)
+# CLI smoke tests: pin the end-to-end counts on the real sample scan through
+# argument parsing and printing. Default counts changed in M3.11 (adaptive C
+# 10 -> 40): 348 words / 903 glyph boxes -> 353 / 1233.
+add_test(NAME Cli.SampleDefault COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png -v --no-recognize)
 set_tests_properties(Cli.SampleDefault PROPERTIES
-  PASS_REGULAR_EXPRESSION "lines: 35   words: 348   chars: 903")
+  PASS_REGULAR_EXPRESSION "lines: 35   words: 353   chars: 1233")
 add_test(NAME Cli.SampleOtsuNoDeskew
-         COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png --otsu --no-deskew)
+         COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png --otsu --no-deskew -v
+                 --no-recognize)
 set_tests_properties(Cli.SampleOtsuNoDeskew PROPERTIES
   PASS_REGULAR_EXPRESSION "otsu thresh: +[0-9]+.*lines: 35   words: 353   chars: 1436")
 add_test(NAME Cli.BadParamIsConfigError
-         COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png --C abc)
+         COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png --C abc --no-recognize)
 set_tests_properties(Cli.BadParamIsConfigError PROPERTIES WILL_FAIL TRUE)
 
 # cudaocr-eval on a tiny fixture: exact (0/11 chars, 0/2 words), one-char typo
@@ -163,6 +181,55 @@ set_tests_properties(Eval.ToolMaxCerFails PROPERTIES WILL_FAIL TRUE)
 add_test(NAME Eval.ToolMaxCerPasses
          COMMAND cudaocr-eval ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/eval/pred
                  ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/eval/gt --max-cer 0.20)
+
+if(CUDAOCR_WITH_ORT)
+  add_test(NAME Cli.TextOutput COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/cli_text_test.sh
+                                       $<TARGET_FILE:cudaocr>)
+  set_tests_properties(Cli.TextOutput PROPERTIES SKIP_RETURN_CODE 77)
+endif()
+if(CUDAOCR_WITH_ORT)
+  # Regression: exit-time heap corruption when a static Ort::Env was destroyed
+  # after the CUDA EP (~15% of runs). 25 fresh processes must all exit cleanly.
+  add_test(NAME Ort.ExitIsClean
+           COMMAND bash -c "for i in $(seq 25); do $<TARGET_FILE:unit_tests> --gtest_filter=OnnxRuntime.RunsAddOnCudaWithoutCpuFallback >/dev/null 2>&1 || { echo \"run $i crashed\"; exit 1; }; done")
+  # Accuracy ratchets (benchmarks/ACCURACY.md): baseline + 1 CER point.
+  # Clean synthetic pages: baseline 0.51% (M3.10) -> max 1.51%.
+  add_test(NAME Accuracy.CleanSyntheticRatchet
+           COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/accuracy_ratchet.sh
+                   $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval> 0.0151
+                   ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/synth
+                   ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/synth
+                   page_sans_clean page_serif_clean page_mono_clean)
+  set_tests_properties(Accuracy.CleanSyntheticRatchet PROPERTIES SKIP_RETURN_CODE 77)
+  # Clean real page (resources/sherlock.png): baseline 0.89% (M3.10) -> max 1.89%.
+  add_test(NAME Accuracy.SherlockRatchet
+           COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/accuracy_ratchet.sh
+                   $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval> 0.0189
+                   ${CMAKE_CURRENT_SOURCE_DIR}/resources
+                   ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/real sherlock)
+  set_tests_properties(Accuracy.SherlockRatchet PROPERTIES SKIP_RETURN_CODE 77)
+  # M3.11 levels (adaptive C = 40): all committed synthetic fixtures 0.35% -> max
+  # 1.35%; all real scans 5.01% -> max 6.01%.
+  add_test(NAME Accuracy.SynthCiRatchet
+           COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/accuracy_ratchet.sh
+                   $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval> 0.0135
+                   ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/synth
+                   ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/synth
+                   page_sans_clean page_serif_clean page_mono_clean page_sans_skew_p3
+                   page_serif_skew_m4 page_sans_noise page_serif_inverted line_pangram_sans
+                   line_digits_serif line_punct_mono)
+  set_tests_properties(Accuracy.SynthCiRatchet PROPERTIES SKIP_RETURN_CODE 77)
+  add_test(NAME Accuracy.RealScansRatchet
+           COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/accuracy_ratchet.sh
+                   $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval> 0.0601
+                   ${CMAKE_CURRENT_SOURCE_DIR}/resources
+                   ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/real
+                   sherlock noisy_text noisy_text2 vigorous-before)
+  set_tests_properties(Accuracy.RealScansRatchet PROPERTIES SKIP_RETURN_CODE 77)
+endif()
+add_test(NAME Cli.BlankPageDetectOnlyExits3
+         COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/blank.png --no-recognize)
+set_tests_properties(Cli.BlankPageDetectOnlyExits3 PROPERTIES WILL_FAIL TRUE)
 
 # Tooling tests (verify gate helpers).
 add_test(NAME Scripts.GenFixtures

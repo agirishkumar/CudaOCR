@@ -178,6 +178,9 @@ struct Formatter { virtual std::string_view extension() const = 0;
 | `otsu` | ImageStage | `OtsuBinarizer` | — (`lastThreshold()`) |
 | `hough` | Deskewer | `HoughDeskewer` | `maxAngle` (0, 45] (15), `step` (0, maxAngle] (0.25); \|angle\| < step/2 → copy |
 | `projection` | TextDetector | `ProjectionDetector` | `minLineHeight` ≥ 1 (3) |
+| `ctc-greedy` | Decoder | `CtcGreedyDecoder` | — (conf = mean prob of emitted symbols) |
+| `txt` | Formatter | `TxtFormatter` | — (recognized lines, one per line; empty lines skipped) |
+| `onnx` | LineRecognizer | `OnnxLineRecognizer` (only with `CUDAOCR_WITH_ORT`) | `model`, `dict` (`$CUDAOCR_MODEL_DIR` or `models/`), `ep` cuda\|cpu (cuda), `maxBatch` ≥ 1 (16), `padFrac` (0.1), `tf32` (false) |
 
 Core support: `DeviceImage::ensure(w, h, ch)` reuses a matching allocation; `DeviceImage::copyTo(dst, stream)` for pass-through stages.
 
@@ -271,6 +274,10 @@ GPU determinism note: kernels that use `atomicAdd` on floats or reduction order 
 | 22 | 2026-11-02 | ORT pinned to 1.31.1 `gpu_cuda13` via FetchContent (URL + SHA-256 from the GitHub release digest), imported as `onnxruntime::onnxruntime`; `CUDAOCR_ORT_ROOT` to reuse an extracted tree; `CUDAOCR_WITH_ORT=OFF` builds the core without it | system install; vendoring binaries in git; Python `onnxruntime` | Reproducible and verifiable without sudo or a 233 MB blob in history; OFF keeps the GPU core buildable anywhere. Verified on driver 595.99 (CUDA 13.2) + toolkit 13.4 + cuDNN 9.27: CUDA EP runs with CPU fallback disabled. |
 
 | 23 | 2026-11-02 | Line crops: pad each detected box by 0.10 × its height on every side (off-page = white), bilinear to H=48 keeping aspect, coordinates in double inside the kernel | 0, 0.05, 0.15, 0.2, 0.3 padding; float coordinates | Sweep over the 6 synthetic pages (detected boxes → GPU crops → PP-OCRv5 on ORT-CPU → greedy CTC): CER 0.37 / 0.41 / **0.25** / 1.52 / 2.46 / 9.96 %; larger pads pull in neighbouring lines (54 % CER on the −4° page at 0.3). Float coordinates risk ~2e-4 error on 1200-px lines vs the 1e-4 oracle bound; double costs nothing measurable here (max diff vs oracle 3e-7). |
+
+| 24 | 2026-11-02 | `onnx` recognizer: TF32 off by default on the CUDA EP; lines sorted by width before batching; GPU batch handed to ORT as a device tensor; per-line output truncated to ⌊outW/8⌋ | ORT defaults (TF32 on); input order batching; host round-trip | TF32 moved probabilities by up to 0.065 vs the CPU EP (1.8e-5 with it off) — correctness first, `tf32=true` stays available. Width sorting minimises white padding; device input avoids a D2H+H2D copy per batch; truncation keeps padding columns out of decoding. |
+
+| 25 | 2026-11-02 | Default adaptive threshold C = 40 (was 10); median stays shared by binarization and recognition; new `binarizePrep` slot for binarizer-only stages (empty by default) | C ∈ {10, 20, 25, 30, 35, 50, 60}, blockSize 21/41/51, Otsu, median 5, median moved to `binarizePrep` | Sweep with `accuracy_report.sh` (CER): C=10 synth-ci 9.17 / real 23.45 / large 19.89 %; Otsu 0.32 / 15.95; C=30 0.28 / 9.04 / 0.28; **C=40 0.35 / 5.01 / 0.21**; C=50 0.32 / 3.24 / 0.21; C=60 large 0.22 but a low-contrast probe (text 170 on paper 235) collapses to 99 % (C ≤ 50: ≤ 0.7 %). C=40 keeps a 25-level margin for faint print; C=50's extra gain comes from one stained scan. Median 5: sherlock 48 %. Median moved to `binarizePrep` (recognizer reads unfiltered gray): sherlock 0.89 → 2.98 %, −4° page 0 → 4.46 % — the median helps recognition here, contradicting a single no-ground-truth observation on sample.png (M3.9). |
 
 *(Append new rows; never delete — supersede with a new row referencing the old.)*
 
