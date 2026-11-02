@@ -13,9 +13,12 @@ namespace {
 
 const std::string kModel = std::string(CUDAOCR_ONNX_FIXTURE_DIR) + "/add.onnx";
 
+// Leaked on purpose: destroying an Ort::Env during static destruction (after the
+// CUDA EP has torn down) intermittently corrupted the heap at exit ("free():
+// chunks in smallbin corrupted", ~3/20 runs). Regression: Ort.ExitIsClean.
 Ort::Env& env() {
-    static Ort::Env e(ORT_LOGGING_LEVEL_WARNING, "cudaocr-test");
-    return e;
+    static Ort::Env* e = new Ort::Env(ORT_LOGGING_LEVEL_WARNING, "cudaocr-test");
+    return *e;
 }
 
 std::vector<float> runAdd(Ort::Session& session) {

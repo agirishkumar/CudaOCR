@@ -82,11 +82,12 @@ Active milestone: **M3** (MOD complete)
   *Accept:* on a rendered single-line fixture ("The quick brown fox jumps over the lazy dog") greedy-decoded text matches exactly on both EPs; CPU and CUDA logits agree within 1e-3.
 - [x] **M3.9 End-to-end text + txt formatter.** Wire recognizer+decoder into `Pipeline`; `TxtFormatter`; CLI prints text to stdout or `-o file.txt`; exit code 3 when no text.
   *Accept:* integration test — CER ≤ 5% on committed clean synthetic pages; `cudaocr resources/sample.png` exits 0 with non-empty output.
-- [ ] **M3.10 Accuracy baseline report.** Run eval on all synthetic variants + 1–2 hand-transcribed `resources/` pages; write `benchmarks/ACCURACY.md`; add a ratchet test that fails if clean-synthetic CER regresses by > 1 point.
+- [x] **M3.10 Accuracy baseline report.** Run eval on all synthetic variants + 1–2 hand-transcribed `resources/` pages; write `benchmarks/ACCURACY.md`; add a ratchet test that fails if clean-synthetic CER regresses by > 1 point.
   *Accept:* report committed; ratchet test green.
 
 - [ ] **M3.11 Default preprocessing on noisy scans.** Found during MOD.4 (and confirmed on `page_sans_noise`: 1/6 lines with defaults, 6/6 with Otsu): with defaults (median 3 + adaptive 31/10) `noisy_text2.png` yields 2 lines vs 9 with Otsu, `noisy_text.png` 3 vs 4. Using the M3.10 CER harness, pick defaults (or an auto-select rule) that maximize recognized text on `resources/` without regressing clean pages; update `PipelineGolden` deliberately with the reason.
   *Accept:* aggregate CER on `resources/` improves vs M3.10 baseline; clean-synthetic CER unchanged.
+  *M3.10 baseline (defaults, `benchmarks/ACCURACY.md`):* clean/skew/inverted synthetic ≈ 0.2–0.3 % CER, every noise page ≈ 99 %; real scans 23.5 % aggregate (sherlock 0.89 %, noisy_text 88.6 %, noisy_text2 98.4 %, vigorous-before 155.6 %). Ratchets: clean synthetic ≤ 1.51 %, sherlock ≤ 1.89 %. Also: the median filter feeds both binarization and recognition — `--median 0` fixes doubled letters on sample.png but makes sherlock worse (3.16 %); decouple before tuning.
 
 ## M4 — Usable product
 

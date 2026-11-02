@@ -14,10 +14,13 @@ namespace cudaocr {
 namespace {
 
 // One Env per process. It must exist before any provider-options call
-// (CreateCUDAProviderOptions needs ORT's default logger; found in M3.4).
+// (CreateCUDAProviderOptions needs ORT's default logger; found in M3.4), and it
+// is deliberately never destroyed: tearing an Env down during static
+// destruction, after the CUDA EP, intermittently corrupted the heap at exit.
 Ort::Env& ortEnv() {
-    static Ort::Env env(ORT_LOGGING_LEVEL_ERROR,
-                        "cudaocr");  // WARNING floods stderr with node-placement notes
+    static Ort::Env& env =
+        *new Ort::Env(ORT_LOGGING_LEVEL_ERROR,
+                      "cudaocr");  // WARNING floods stderr with node-placement notes
     return env;
 }
 
