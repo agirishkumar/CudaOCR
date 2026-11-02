@@ -28,6 +28,11 @@ image ─► grayscale ─► median denoise ─► polarity normalize ─► ad
 - CMake >= 3.24, a C++20 host compiler (developed with g++ 13 and 15)
 - No other system dependencies: image I/O is vendored (stb), GoogleTest is
   fetched at configure time.
+- ONNX Runtime 1.31.1 (CUDA 13 build, ~233 MB, SHA-256 pinned) is downloaded at
+  configure time for the recognizer. Its CUDA execution provider needs cuDNN 9 for
+  CUDA 13 (`sudo apt install cudnn9-cuda-13`). Options:
+  `-DCUDAOCR_WITH_ORT=OFF` builds without it; `-DCUDAOCR_ORT_ROOT=<dir>` reuses an
+  extracted tree (e.g. `build/_deps/onnxruntime-src`) instead of downloading again.
 
 ## Build & test
 
