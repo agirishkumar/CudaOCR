@@ -21,7 +21,7 @@ lastFailure: (none)
 - MOD.3, 2026-11-02, "components: wrap existing kernels as built-in components (MOD.3)"
 
 ## AWAITING-MERGE
-(none)
+- PR #6 https://github.com/agirishkumar/CudaOCR/pull/6 (task/MOD.3-wrap-stages)
 
 ## BLOCKED
 (none)
