@@ -59,13 +59,14 @@ struct Pipeline::Impl {
     Stream stream;
     std::unique_ptr<ImageStage> toGray;
     std::vector<std::unique_ptr<ImageStage>> preprocess;
+    std::vector<std::unique_ptr<ImageStage>> binarizePrep;
     std::unique_ptr<ImageStage> binarizer;
     std::unique_ptr<Deskewer> deskewer;  // null = skip
     std::unique_ptr<TextDetector> detector;
     std::unique_ptr<LineRecognizer> recognizer;  // null = detection only
     std::unique_ptr<Decoder> decoder;
     // Device buffers reused across runs (DeviceImage::ensure).
-    DeviceImage input, a, b, bin, straight, grayStraight;
+    DeviceImage input, a, b, c, d, bin, straight, grayStraight;
 };
 
 Pipeline::Pipeline(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
@@ -84,6 +85,11 @@ Result<Pipeline> Pipeline::create(const PipelineConfig& cfg, const ComponentRegi
         std::unique_ptr<ImageStage> st;
         s = resolve(registry, cfg.preprocess[i], "preprocess[" + std::to_string(i) + "]", st);
         if (s.ok()) impl->preprocess.push_back(std::move(st));
+    }
+    for (size_t i = 0; s.ok() && i < cfg.binarizePrep.size(); ++i) {
+        std::unique_ptr<ImageStage> st;
+        s = resolve(registry, cfg.binarizePrep[i], "binarizePrep[" + std::to_string(i) + "]", st);
+        if (s.ok()) impl->binarizePrep.push_back(std::move(st));
     }
     if (s.ok()) s = resolve(registry, cfg.binarizer, "binarizer", impl->binarizer);
     if (s.ok() && cfg.deskewer) s = resolve(registry, *cfg.deskewer, "deskewer", impl->deskewer);
@@ -129,7 +135,19 @@ Result<PageResult> Pipeline::run(const HostImage& input, StageImages* keep) {
         if (!s.ok()) return s;
     }
 
-    s = timer.timed(page, m.binarizer->name(), [&] { return m.binarizer->run(*cur, m.bin, ctx); });
+    // binarizePrep runs on its own buffers (c/d) so G stays untouched.
+    const DeviceImage* g = cur;
+    const DeviceImage* binIn = g;
+    DeviceImage* prepOut = &m.c;
+    for (size_t i = 0; i < m.binarizePrep.size(); ++i) {
+        ImageStage& stage = *m.binarizePrep[i];
+        s = timer.timed(page, stage.name(), [&] { return stage.run(*binIn, *prepOut, ctx); });
+        if (!s.ok()) return s;
+        binIn = prepOut;
+        prepOut = (prepOut == &m.c) ? &m.d : &m.c;
+    }
+    s = timer.timed(page, m.binarizer->name(),
+                    [&] { return m.binarizer->run(*binIn, m.bin, ctx); });
     if (!s.ok()) return s;
     if (keep) {
         s = m.bin.download(keep->binary, m.stream.get());
@@ -141,7 +159,7 @@ Result<PageResult> Pipeline::run(const HostImage& input, StageImages* keep) {
     // on one are valid crops on the other. Polarity already ran, so the fill is
     // paper-white for both.
     const DeviceImage* binary = &m.bin;
-    const DeviceImage* gray = cur;
+    const DeviceImage* gray = g;
     if (m.deskewer) {
         s = timer.timed(page, m.deskewer->name(), [&]() -> Status {
             auto angle = m.deskewer->estimate(m.bin, ctx);
@@ -149,7 +167,7 @@ Result<PageResult> Pipeline::run(const HostImage& input, StageImages* keep) {
             page.skewDeg = angle.value();
             Status st = m.deskewer->apply(-angle.value(), m.bin, m.straight, 255, ctx);
             if (!st.ok()) return st;
-            return m.deskewer->apply(-angle.value(), *cur, m.grayStraight, 255, ctx);
+            return m.deskewer->apply(-angle.value(), *g, m.grayStraight, 255, ctx);
         });
         if (!s.ok()) return s;
         binary = &m.straight;

@@ -277,6 +277,8 @@ GPU determinism note: kernels that use `atomicAdd` on floats or reduction order 
 
 | 24 | 2026-11-02 | `onnx` recognizer: TF32 off by default on the CUDA EP; lines sorted by width before batching; GPU batch handed to ORT as a device tensor; per-line output truncated to ⌊outW/8⌋ | ORT defaults (TF32 on); input order batching; host round-trip | TF32 moved probabilities by up to 0.065 vs the CPU EP (1.8e-5 with it off) — correctness first, `tf32=true` stays available. Width sorting minimises white padding; device input avoids a D2H+H2D copy per batch; truncation keeps padding columns out of decoding. |
 
+| 25 | 2026-11-02 | Default adaptive threshold C = 40 (was 10); median stays shared by binarization and recognition; new `binarizePrep` slot for binarizer-only stages (empty by default) | C ∈ {10, 20, 25, 30, 35, 50, 60}, blockSize 21/41/51, Otsu, median 5, median moved to `binarizePrep` | Sweep with `accuracy_report.sh` (CER): C=10 synth-ci 9.17 / real 23.45 / large 19.89 %; Otsu 0.32 / 15.95; C=30 0.28 / 9.04 / 0.28; **C=40 0.35 / 5.01 / 0.21**; C=50 0.32 / 3.24 / 0.21; C=60 large 0.22 but a low-contrast probe (text 170 on paper 235) collapses to 99 % (C ≤ 50: ≤ 0.7 %). C=40 keeps a 25-level margin for faint print; C=50's extra gain comes from one stained scan. Median 5: sherlock 48 %. Median moved to `binarizePrep` (recognizer reads unfiltered gray): sherlock 0.89 → 2.98 %, −4° page 0 → 4.46 % — the median helps recognition here, contradicting a single no-ground-truth observation on sample.png (M3.9). |
+
 *(Append new rows; never delete — supersede with a new row referencing the old.)*
 
 ## 12. Migration plan from current code (feeds BACKLOG.md M0)

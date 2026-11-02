@@ -129,9 +129,9 @@ TEST(AdaptiveBinarizer, MatchesFreeFunctionAndValidates) {
     EXPECT_TRUE(imagesEqual(runStage(*st, gray()), runDirect(gray(), 1, [](auto& i, auto& o) {
                                 return adaptiveThreshold(i, o, 15, 4);
                             })));
-    auto defaults = make<AdaptiveBinarizer>();  // documented defaults: 31, 10
+    auto defaults = make<AdaptiveBinarizer>();  // documented defaults: 31, 40 (decision #25)
     EXPECT_TRUE(imagesEqual(runStage(*defaults, gray()), runDirect(gray(), 1, [](auto& i, auto& o) {
-                                return adaptiveThreshold(i, o, 31, 10);
+                                return adaptiveThreshold(i, o, 31, 40);
                             })));
     expectRejected<AdaptiveBinarizer>(Params().set("blockSize", 16), "even blockSize");
     expectRejected<AdaptiveBinarizer>(Params().set("blockSize", 1), "blockSize < 3");

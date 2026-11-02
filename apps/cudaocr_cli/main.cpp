@@ -27,7 +27,8 @@ void usage() {
         "  --dump-stages <dir>   write gray/binary/deskewed/overlay PNGs\n"
         "  --otsu                global Otsu instead of adaptive threshold\n"
         "  --block-size <n>      adaptive threshold window (odd, default 31)\n"
-        "  --C <n>               adaptive threshold offset (default 10)\n"
+        "  --C <n>               adaptive threshold offset (default 40; 50 helps stained scans,\n"
+        "                        > 50 loses faint text)\n"
         "  --median <0|3|5>      denoise kernel (default 3, 0 = off)\n"
         "  --equalize            histogram equalization before binarization\n"
         "  --no-deskew           skip skew detection/correction\n"
@@ -155,6 +156,7 @@ struct Knobs {
 PipelineConfig toConfig(const Knobs& k) {
     PipelineConfig cfg;
     cfg.preprocess.clear();
+    cfg.binarizePrep.clear();
     if (k.equalize) cfg.preprocess.push_back({"equalize", {}});
     if (k.median != "0") cfg.preprocess.push_back({"median", Params().set("k", k.median)});
     cfg.preprocess.push_back({"polarity", {}});

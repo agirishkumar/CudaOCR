@@ -1,8 +1,8 @@
 # LOOP_STATE — machine state for /engineer-step iterations
 
-Active milestone: M3 — batch M3.7–M3.11 on one branch (user request: single PR at the end)
+Active milestone: M4 (M3 complete; M3.7–M3.11 shipped as one PR on user request)
 
-CURRENT: M3.11
+CURRENT: (none)
 branch: task/M3.7-M3.11-functional-ocr
 pr: (none)
 attempts: 0
@@ -30,6 +30,7 @@ lastFailure: (none)
 - M3.8, 2026-11-02, "components: ONNX Runtime line recognizer (M3.8)"
 - M3.9, 2026-11-02, "pipeline: end-to-end text, txt formatter, CLI text output (M3.9)"
 - M3.10, 2026-11-02, "benchmarks: accuracy baseline, real-scan ground truth, ratchets; fix ORT exit crash (M3.10)"
+- M3.11, 2026-11-02, "pipeline: adaptive C 40 default, binarizePrep slot, new ratchets (M3.11)"
 
 ## AWAITING-MERGE
 (none)

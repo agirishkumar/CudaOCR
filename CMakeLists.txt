@@ -152,11 +152,12 @@ set_target_properties(unit_tests PROPERTIES
 include(GoogleTest)
 gtest_discover_tests(unit_tests DISCOVERY_TIMEOUT 60)
 
-# CLI smoke tests: pin the end-to-end counts on the real sample scan
-# (same numbers as PipelineGolden, through argument parsing and printing).
+# CLI smoke tests: pin the end-to-end counts on the real sample scan through
+# argument parsing and printing. Default counts changed in M3.11 (adaptive C
+# 10 -> 40): 348 words / 903 glyph boxes -> 353 / 1233.
 add_test(NAME Cli.SampleDefault COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png -v --no-recognize)
 set_tests_properties(Cli.SampleDefault PROPERTIES
-  PASS_REGULAR_EXPRESSION "lines: 35   words: 348   chars: 903")
+  PASS_REGULAR_EXPRESSION "lines: 35   words: 353   chars: 1233")
 add_test(NAME Cli.SampleOtsuNoDeskew
          COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png --otsu --no-deskew -v
                  --no-recognize)
@@ -207,6 +208,24 @@ if(CUDAOCR_WITH_ORT)
                    ${CMAKE_CURRENT_SOURCE_DIR}/resources
                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/real sherlock)
   set_tests_properties(Accuracy.SherlockRatchet PROPERTIES SKIP_RETURN_CODE 77)
+  # M3.11 levels (adaptive C = 40): all committed synthetic fixtures 0.35% -> max
+  # 1.35%; all real scans 5.01% -> max 6.01%.
+  add_test(NAME Accuracy.SynthCiRatchet
+           COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/accuracy_ratchet.sh
+                   $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval> 0.0135
+                   ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/synth
+                   ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/synth
+                   page_sans_clean page_serif_clean page_mono_clean page_sans_skew_p3
+                   page_serif_skew_m4 page_sans_noise page_serif_inverted line_pangram_sans
+                   line_digits_serif line_punct_mono)
+  set_tests_properties(Accuracy.SynthCiRatchet PROPERTIES SKIP_RETURN_CODE 77)
+  add_test(NAME Accuracy.RealScansRatchet
+           COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/accuracy_ratchet.sh
+                   $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval> 0.0601
+                   ${CMAKE_CURRENT_SOURCE_DIR}/resources
+                   ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/real
+                   sherlock noisy_text noisy_text2 vigorous-before)
+  set_tests_properties(Accuracy.RealScansRatchet PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 add_test(NAME Cli.BlankPageDetectOnlyExits3
          COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/blank.png --no-recognize)
