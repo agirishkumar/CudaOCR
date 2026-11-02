@@ -39,3 +39,21 @@ Strings are JSON-escaped (`\"`, `\\`, `\n`, `\t`, `\r`, `\u00XX` for other contr
 characters); other UTF-8 passes through. Numbers use the shortest round-trip form. Layout
 is deterministic (one word per line) so outputs diff cleanly. Breaking changes bump the
 schema suffix.
+
+## `hocr`
+
+[hOCR 1.2](http://kba.github.io/hocr-spec/1.2/) XHTML (well-formed XML, UTF-8), e.g. for
+searchable-PDF tools:
+
+```html
+<div class="ocr_page" id="page_1" title="bbox 0 0 1252 159">
+ <span class="ocr_line" id="line_1_1" title="bbox 50 59 1198 107; x_wconf 99">
+  <span class="ocrx_word" id="word_1_1_1" title="bbox 59 59 137 107; x_wconf 100">The</span>
+  ...
+```
+
+- `bbox` uses **exclusive** right/bottom (`x1 + 1`, `y1 + 1` of the JSON's inclusive box),
+  the convention Tesseract writes; coordinates are in the deskewed frame like the JSON.
+- `x_wconf` = round(conf × 100).
+- Words with unknown geometry omit `bbox`; a recognized line without words carries its text
+  directly. Text is XML-escaped (`& < > " '`).

@@ -180,6 +180,8 @@ struct Formatter { virtual std::string_view extension() const = 0;
 | `projection` | TextDetector | `ProjectionDetector` | `minLineHeight` ≥ 1 (3) |
 | `ctc-greedy` | Decoder | `CtcGreedyDecoder` | — (conf = mean prob of emitted symbols) |
 | `txt` | Formatter | `TxtFormatter` | — (recognized lines, one per line; empty lines skipped) |
+| `json` | Formatter | `JsonFormatter` | — (schema `cudaocr.page/1`, docs/output-formats.md) |
+| `hocr` | Formatter | `HocrFormatter` | — (hOCR 1.2 XHTML, exclusive bbox, x_wconf) |
 | `onnx` | LineRecognizer | `OnnxLineRecognizer` (only with `CUDAOCR_WITH_ORT`) | `model`, `dict` (`$CUDAOCR_MODEL_DIR` or `models/`), `ep` cuda\|cpu (cuda), `maxBatch` ≥ 1 (16), `padFrac` (0.1), `tf32` (false) |
 
 Core support: `DeviceImage::ensure(w, h, ch)` reuses a matching allocation; `DeviceImage::copyTo(dst, stream)` for pass-through stages.

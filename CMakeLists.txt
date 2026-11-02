@@ -41,6 +41,7 @@ add_library(cudaocr_lib STATIC
   src/components/charset.cpp
   src/components/txt_formatter.cpp
   src/components/json_formatter.cpp
+  src/components/hocr_formatter.cpp
   src/components/words.cpp
   src/eval/metrics.cpp
   src/pipeline.cu
@@ -119,6 +120,7 @@ add_executable(unit_tests
   tests/unit/ctc_decoder_test.cpp
   tests/unit/txt_formatter_test.cpp
   tests/unit/json_formatter_test.cpp
+  tests/unit/hocr_formatter_test.cpp
   tests/unit/words_from_ctc_test.cpp
   tests/unit/components_test.cpp
   tests/unit/device_test.cu
