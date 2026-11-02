@@ -36,6 +36,7 @@ add_library(cudaocr_lib STATIC
   src/components/hough_deskewer.cpp
   src/components/projection_detector.cpp
   src/components/builtin.cpp
+  src/eval/metrics.cpp
   src/pipeline.cu
 )
 target_include_directories(cudaocr_lib PUBLIC include)
@@ -45,9 +46,11 @@ set_target_properties(cudaocr_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 add_executable(cudaocr apps/cudaocr_cli/main.cpp)
 target_link_libraries(cudaocr PRIVATE cudaocr_lib)
+add_executable(cudaocr-eval apps/cudaocr_eval/main.cpp)
+target_link_libraries(cudaocr-eval PRIVATE cudaocr_lib)
 
 include(GNUInstallDirs)
-install(TARGETS cudaocr RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS cudaocr cudaocr-eval RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # ---- tests ----
 include(FetchContent)
@@ -68,6 +71,7 @@ add_executable(unit_tests
   tests/unit/types_test.cpp
   tests/unit/params_test.cpp
   tests/unit/registry_test.cpp
+  tests/unit/eval_test.cpp
   tests/unit/components_test.cpp
   tests/unit/device_test.cu
   tests/unit/stream_ordering_test.cu
@@ -106,6 +110,21 @@ set_tests_properties(Cli.SampleOtsuNoDeskew PROPERTIES
 add_test(NAME Cli.BadParamIsConfigError
          COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png --C abc)
 set_tests_properties(Cli.BadParamIsConfigError PROPERTIES WILL_FAIL TRUE)
+
+# cudaocr-eval on a tiny fixture: exact (0/11 chars, 0/2 words), one-char typo
+# (1/19, 1/4), missing prediction (5/5, 1/1) -> aggregate CER 6/35, WER 2/7.
+add_test(NAME Eval.ToolAggregate
+         COMMAND cudaocr-eval ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/eval/pred
+                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/eval/gt)
+set_tests_properties(Eval.ToolAggregate PROPERTIES
+  PASS_REGULAR_EXPRESSION "total.*17[.]14%.*6/35.*28[.]57%.*2/7.*missing: 1")
+add_test(NAME Eval.ToolMaxCerFails
+         COMMAND cudaocr-eval ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/eval/pred
+                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/eval/gt --max-cer 0.10)
+set_tests_properties(Eval.ToolMaxCerFails PROPERTIES WILL_FAIL TRUE)
+add_test(NAME Eval.ToolMaxCerPasses
+         COMMAND cudaocr-eval ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/eval/pred
+                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/eval/gt --max-cer 0.20)
 
 # Tooling tests (verify gate helpers).
 add_test(NAME Scripts.GenFixtures

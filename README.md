@@ -44,6 +44,12 @@ ctest --test-dir build --output-on-failure   # 60 tests, all GPU kernels vs CPU 
 ./build/cudaocr resources/sample.png --benchmark -o out.json --dump-stages stages/
 ```
 
+Score OCR output against ground truth (CER/WER over Unicode code points, whitespace-normalized):
+
+```bash
+./build/cudaocr-eval <pred_dir> <gt_dir> [--max-cer 0.05]   # <name>.txt vs <name>.gt.txt
+```
+
 `--dump-stages` writes the intermediate images plus an overlay with detected
 lines (blue), words (red), and characters (green). See `./build/cudaocr --help`
 for thresholding/deskew options.
