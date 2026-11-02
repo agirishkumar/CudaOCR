@@ -66,7 +66,7 @@ Active milestone: **M3** (MOD complete)
 - [x] **M3.1 Synthetic ground-truth fixtures.** `scripts/gen_fixtures.py` (Python + Pillow, seeded): renders pages/lines of known text with DejaVu/Liberation fonts at 300 DPI; variants: clean, skew ±5°, gaussian noise, inverted. Writes `*.png` + `*.gt.txt`. Commit a small set (≤ 2 MB) under `tests/fixtures/synth/`.
   *Accept:* script is deterministic (same seed → identical bytes); existing segmentation finds the expected line count on the committed clean pages.
   *Done:* 10 fixtures (900 KB) + `--check`/`--set large`; exposed and fixed descender-sliver over-segmentation in `detectLines` (all variants now exact; noise needs Otsu → M3.11).
-- [ ] **M3.2 CER/WER evaluation module + tool.** `src/eval/` Levenshtein-based CER/WER (host C++), `cudaocr-eval <pred_dir> <gt_dir>` → per-file + aggregate table (markdown).
+- [x] **M3.2 CER/WER evaluation module + tool.** `src/eval/` Levenshtein-based CER/WER (host C++), `cudaocr-eval <pred_dir> <gt_dir>` → per-file + aggregate table (markdown).
   *Accept:* unit tests on known pairs (identical → 0, one substitution, insert/delete, empty strings, UTF-8 multi-byte).
 - [ ] **M3.3 Gray deskew path.** Pipeline keeps the deskewed gray image (same angle as binary) for recognition; `--dump-stages` writes it.
   *Accept:* test — rotating gray and binary with the detected angle yields aligned images (binary of rotated gray ≈ rotated binary within documented tolerance).

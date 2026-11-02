@@ -1,6 +1,6 @@
 # LOOP_STATE — machine state for /engineer-step iterations
 
-Active milestone: M3 (next unchecked task: M3.2 CER/WER evaluation module)
+Active milestone: M3 (next unchecked task: M3.3 gray deskew path)
 
 CURRENT: (none)
 branch: (none)
@@ -20,10 +20,11 @@ lastFailure: (none)
 - MOD.2, 2026-11-02, "components: add stage interfaces and Params (MOD.2)" — PR #5 merged
 - MOD.3, 2026-11-02, "components: wrap existing kernels as built-in components (MOD.3)" — PR #6 merged
 - MOD.4, 2026-11-02, "pipeline: registry + config-built Pipeline; fix stream race; pin legacy output (MOD.4)" — PR #7 merged
-- M3.1, 2026-11-02, "fixtures: synthetic ground-truth generator; merge descender slivers (M3.1)"
+- M3.1, 2026-11-02, "fixtures: synthetic ground-truth generator; merge descender slivers (M3.1)" — PR #8 merged
+- M3.2, 2026-11-02, "eval: CER/WER metrics and cudaocr-eval tool (M3.2)"
 
 ## AWAITING-MERGE
-- PR #8 https://github.com/agirishkumar/CudaOCR/pull/8 (task/M3.1-synthetic-fixtures)
+- PR #9 https://github.com/agirishkumar/CudaOCR/pull/9 (task/M3.2-cer-wer-eval)
 
 ## BLOCKED
 (none)
