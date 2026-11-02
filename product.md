@@ -87,7 +87,7 @@ Hough skew estimate on the binary image; the same angle rotates both binary (for
 - Character boxes are **optional** (debug overlay only). GPU connected-component labeling is an M6 learning task, not on the functional path.
 
 ### Stage 5 — Line recognition (`LineRecognizer` + `Decoder`)
-- **M3 (functional):** `onnx` recognizer running the **PP-OCRv5 English recognition model** (ONNX export, ~7.5 MB, CTC head + character dictionary file) through **ONNX Runtime ≥1.27** (`gpu_cuda13` build), execution provider selectable (`cuda` | `cpu`). Input: each line cropped from the deskewed gray image, resized to the model's input height (expected 48 — confirmed from the model in M3.2) with aspect kept, normalized, batched.
+- **M3 (functional):** `onnx` recognizer running the **PP-OCRv5 English recognition model** (`en_PP-OCRv5_mobile_rec`, 7.8 MB, 1.94M params, 438 CTC classes) through **ONNX Runtime 1.31.1** (`gpu_cuda13` build), execution provider selectable (`cuda` | `cpu`). Input contract measured in M3.5 (`models/README.md`): tight line crop → height 48, aspect kept, 3 channels, `(v/255−0.5)/0.5`; output `[N, ⌊W/8⌋, 438]` probabilities.
 - **M5 (custom):** `cuda` recognizer — hand-written kernels for the same model's ops (conv/depthwise conv with folded BN, hardswish, attention/matmul, layernorm, linear, softmax), loading the same weights. ORT-CPU logits are the oracle.
 - **Decoder:** CTC greedy (M3); beam search + optional wordlist (M6).
 
