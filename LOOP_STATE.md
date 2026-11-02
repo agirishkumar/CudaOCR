@@ -1,6 +1,6 @@
 # LOOP_STATE — machine state for /engineer-step iterations
 
-Active milestone: MOD (next unchecked task: MOD.2 component interfaces), then M3
+Active milestone: MOD (next unchecked task: MOD.3 wrap existing stages), then M3
 
 CURRENT: (none)
 branch: (none)
@@ -16,10 +16,11 @@ lastFailure: (none)
 - W.1, 2026-11-02, "build: set CUDA arch default before project() (W.1)" — PR #1 merged
 - W.2, 2026-11-02, "verify: check everything the branch changes, not just the working tree (W.2)" — PR #2 merged
 - MOD.1, 2026-11-02, "types: add host-only page/line/word result types (MOD.1)" — PR #3 merged
-- W.3, 2026-11-02, "style: clang-format the whole tree; add verify.sh --all-format (W.3)"
+- W.3, 2026-11-02, "style: clang-format the whole tree; add verify.sh --all-format (W.3)" — PR #4 merged
+- MOD.2, 2026-11-02, "components: add stage interfaces and Params (MOD.2)"
 
 ## AWAITING-MERGE
-- PR #4 https://github.com/agirishkumar/CudaOCR/pull/4 (task/W.3-format-tree)
+(none)
 
 ## BLOCKED
 (none)
