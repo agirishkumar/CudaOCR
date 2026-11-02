@@ -29,17 +29,18 @@ constexpr int64_t kClasses = kDictEntries + 2;  // blank (index 0) + dict + spac
     if (!fs::exists(kModel) || !fs::exists(kDict)) \
     GTEST_SKIP() << "models not fetched; run scripts/fetch_models.sh (expects " << kModel << ")"
 
+// Process-lifetime singletons, leaked on purpose (see ort_smoke_test.cpp).
 Ort::Env& env() {
-    static Ort::Env e(ORT_LOGGING_LEVEL_WARNING, "cudaocr-rec-test");
-    return e;
+    static Ort::Env* e = new Ort::Env(ORT_LOGGING_LEVEL_WARNING, "cudaocr-rec-test");
+    return *e;
 }
 
 Ort::Session& session() {
-    static Ort::Session s = [] {
+    static Ort::Session* s = [] {
         Ort::SessionOptions opts;
-        return Ort::Session(env(), kModel.c_str(), opts);
+        return new Ort::Session(env(), kModel.c_str(), opts);
     }();
-    return s;
+    return *s;
 }
 
 // Runs a uniform-gray [1, 3, 48, width] input; returns {T, C, data}.

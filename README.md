@@ -56,6 +56,12 @@ ctest --test-dir build --output-on-failure   # 60 tests, all GPU kernels vs CPU 
 
 Exit codes: 0 text found, 1 bad input/config, 2 GPU/runtime error, 3 no text found.
 
+Accuracy report over all fixture sets (writes `benchmarks/ACCURACY.md`):
+
+```bash
+./scripts/accuracy_report.sh [--large]      # --large adds a generated 50-page synthetic set
+```
+
 Score OCR output against ground truth (CER/WER over Unicode code points, whitespace-normalized):
 
 ```bash

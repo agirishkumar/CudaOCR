@@ -186,6 +186,28 @@ if(CUDAOCR_WITH_ORT)
                                        $<TARGET_FILE:cudaocr>)
   set_tests_properties(Cli.TextOutput PROPERTIES SKIP_RETURN_CODE 77)
 endif()
+if(CUDAOCR_WITH_ORT)
+  # Regression: exit-time heap corruption when a static Ort::Env was destroyed
+  # after the CUDA EP (~15% of runs). 25 fresh processes must all exit cleanly.
+  add_test(NAME Ort.ExitIsClean
+           COMMAND bash -c "for i in $(seq 25); do $<TARGET_FILE:unit_tests> --gtest_filter=OnnxRuntime.RunsAddOnCudaWithoutCpuFallback >/dev/null 2>&1 || { echo \"run $i crashed\"; exit 1; }; done")
+  # Accuracy ratchets (benchmarks/ACCURACY.md): baseline + 1 CER point.
+  # Clean synthetic pages: baseline 0.51% (M3.10) -> max 1.51%.
+  add_test(NAME Accuracy.CleanSyntheticRatchet
+           COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/accuracy_ratchet.sh
+                   $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval> 0.0151
+                   ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/synth
+                   ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/synth
+                   page_sans_clean page_serif_clean page_mono_clean)
+  set_tests_properties(Accuracy.CleanSyntheticRatchet PROPERTIES SKIP_RETURN_CODE 77)
+  # Clean real page (resources/sherlock.png): baseline 0.89% (M3.10) -> max 1.89%.
+  add_test(NAME Accuracy.SherlockRatchet
+           COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/accuracy_ratchet.sh
+                   $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval> 0.0189
+                   ${CMAKE_CURRENT_SOURCE_DIR}/resources
+                   ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/real sherlock)
+  set_tests_properties(Accuracy.SherlockRatchet PROPERTIES SKIP_RETURN_CODE 77)
+endif()
 add_test(NAME Cli.BlankPageDetectOnlyExits3
          COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/blank.png --no-recognize)
 set_tests_properties(Cli.BlankPageDetectOnlyExits3 PROPERTIES WILL_FAIL TRUE)

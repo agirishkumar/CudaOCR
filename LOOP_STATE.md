@@ -2,7 +2,7 @@
 
 Active milestone: M3 — batch M3.7–M3.11 on one branch (user request: single PR at the end)
 
-CURRENT: M3.10
+CURRENT: M3.11
 branch: task/M3.7-M3.11-functional-ocr
 pr: (none)
 attempts: 0
@@ -29,6 +29,7 @@ lastFailure: (none)
 - M3.7, 2026-11-02, "components: CTC greedy decoder (M3.7)"
 - M3.8, 2026-11-02, "components: ONNX Runtime line recognizer (M3.8)"
 - M3.9, 2026-11-02, "pipeline: end-to-end text, txt formatter, CLI text output (M3.9)"
+- M3.10, 2026-11-02, "benchmarks: accuracy baseline, real-scan ground truth, ratchets; fix ORT exit crash (M3.10)"
 
 ## AWAITING-MERGE
 (none)
