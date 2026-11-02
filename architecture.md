@@ -196,8 +196,10 @@ Rules: components never call each other directly — only `Pipeline` composes th
 **Verification gate** (the loop's verification condition, also `scripts/verify.sh`):
 1. Configure+build clean: `cmake --build build -j` → zero errors, zero *new* warnings.
 2. `ctest --test-dir build --output-on-failure` → 100% pass.
-3. If any `.cu` under `src/` changed: `compute-sanitizer --tool memcheck ./build/tests/unit_tests --gtest_filter=<touched stages>` → 0 errors.
+3. If any `.cu`/`.cuh` changed (or `--full`): `compute-sanitizer --tool memcheck ./build/tests/unit_tests` → 0 errors.
 4. `clang-format --dry-run --Werror` on changed files.
+
+"Changed" = everything the branch touches vs its merge-base with `origin/main` — committed, staged, unstaged and untracked (`scripts/changed_files.sh`) — so a clean task branch is still fully checked.
 
 GPU determinism note: kernels that use `atomicAdd` on floats or reduction order must either be made deterministic for tests (fixed block config, integer atomics — the Hough accumulator is already integer) or tested with tolerance, decided per kernel and documented in the test.
 

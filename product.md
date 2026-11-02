@@ -53,7 +53,7 @@ Priorities, in order:
 ### 4.3 Known bugs & issues
 
 1. ~~**CUDA arch default never applies.**~~ *Fixed in W.1 (regression test `CudaArch.CudaArchMatchesDevice`).* `CMakeLists.txt` sets `CMAKE_CUDA_ARCHITECTURES 86` *after* `project()`, by which point CMake has already defined it from the compiler default (75). Binaries contain sm_75 SASS + compute_75 PTX, so on the sm_86 GPU every kernel is PTX-JIT-compiled. Since the toolkit moved to 13.4 while the driver supports 13.2, JIT fails ("PTX was compiled with an unsupported toolchain") and 33/59 tests fail. Confirmed fix: configuring with `-DCMAKE_CUDA_ARCHITECTURES=86` → 59/59 pass. Backlog W.1.
-2. **`verify.sh` diffs against `HEAD`**, so on a task branch with committed work the memcheck/format steps see no changes. Must diff against the merge-base with `main`. Backlog W.2.
+2. ~~**`verify.sh` diffs against `HEAD`**~~ *Fixed in W.2 (`scripts/changed_files.sh`, test `Scripts.ChangedFiles`).*, so on a task branch with committed work the memcheck/format steps see no changes. Must diff against the merge-base with `main`. Backlog W.2.
 3. **Character segmentation under-splits**: 903 chars / 348 words ≈ 2.6 chars/word on the sample (English averages ~4.7) — touching glyphs merge under the 1-blank-column rule. Low impact: line-level CTC recognition does not need char boxes.
 4. **Deskew only rotates the binary image.** A recognizer needs the deskewed *grayscale* image. Backlog M3.3.
 5. **Projection-profile layout assumes a single text column.** Multi-column pages, tables, and figures interleave lines. Accepted for v1; the `TextDetector` interface lets a learned detector (DBNet) replace it in M6.
@@ -124,8 +124,8 @@ Ordering principle: **functional end-to-end first, then usable, then custom/opti
 | **M0** Re-foundation | CMake/CUDA 13/C++20 build, test harness, core RAII, logger, CLI | ✅ done |
 | **M1** Preprocessing | Custom preprocessing kernels + oracles + NPP benchmarks | ✅ done (M1.9/M1.10 perf → M6) |
 | **M2** Layout | Hough deskew, GPU rotate, projection line/word segmentation | ✅ done (M2.5 CCL → M6) |
-| **W** Workflow fixes | Fix CUDA arch default; branch-aware `verify.sh` | ⏳ next |
-| **MOD** Modular core | Result types, component interfaces, registry, Pipeline built from config; existing stages wrapped with zero behavior change | ⏳ |
+| **W** Workflow fixes | Fix CUDA arch default; branch-aware `verify.sh` | ✅ done |
+| **MOD** Modular core | Result types, component interfaces, registry, Pipeline built from config; existing stages wrapped with zero behavior change | ⏳ next |
 | **M3** Functional OCR | Ground-truth fixtures + CER tool, ORT dependency, line crop/normalize kernel, ONNX recognizer, CTC decoder, txt output, accuracy baseline | ⏳ |
 | **M4** Usable product | JSON/hOCR output, TOML config, multi-page input, GitHub Actions compile/format CI, README results tables | ⏳ |
 | **M5** Custom recognizer | Hand-written CUDA inference for the recognition model; ORT as oracle | ⏳ |
