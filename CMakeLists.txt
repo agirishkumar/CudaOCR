@@ -1,13 +1,15 @@
 cmake_minimum_required(VERSION 3.24)
+# Must precede project(): enabling CUDA defines CMAKE_CUDA_ARCHITECTURES from the
+# compiler default (sm_75), after which a NOT DEFINED guard never fires.
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+  set(CMAKE_CUDA_ARCHITECTURES 86 CACHE STRING "CUDA architectures (default: RTX 3060 Laptop)")
+endif()
 project(cudaocr LANGUAGES CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 20)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-  set(CMAKE_CUDA_ARCHITECTURES 86)
-endif()
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -21,6 +23,7 @@ add_library(cudaocr_lib STATIC
   src/core/logger.cpp
   src/core/host_image.cpp
   src/core/device_image.cu
+  src/core/device_info.cu
   src/stages/grayscale.cu
   src/stages/filters.cu
   src/stages/binarize.cu
