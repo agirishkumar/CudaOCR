@@ -32,9 +32,9 @@ image ─► grayscale ─► median denoise ─► polarity normalize ─► ad
 ## Build & test
 
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=86  # explicit arch until W.1 lands
+cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
-ctest --test-dir build --output-on-failure   # 59 tests, all GPU kernels vs CPU oracles
+ctest --test-dir build --output-on-failure   # 60 tests, all GPU kernels vs CPU oracles
 ./scripts/verify.sh                          # full gate: build + tests + memcheck
 ```
 
