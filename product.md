@@ -52,7 +52,7 @@ Priorities, in order:
 
 ### 4.3 Known bugs & issues
 
-1. **CUDA arch default never applies (blocks all GPU tests on the current machine).** `CMakeLists.txt` sets `CMAKE_CUDA_ARCHITECTURES 86` *after* `project()`, by which point CMake has already defined it from the compiler default (75). Binaries contain sm_75 SASS + compute_75 PTX, so on the sm_86 GPU every kernel is PTX-JIT-compiled. Since the toolkit moved to 13.4 while the driver supports 13.2, JIT fails ("PTX was compiled with an unsupported toolchain") and 33/59 tests fail. Confirmed fix: configuring with `-DCMAKE_CUDA_ARCHITECTURES=86` → 59/59 pass. Backlog W.1.
+1. ~~**CUDA arch default never applies.**~~ *Fixed in W.1 (regression test `CudaArch.CudaArchMatchesDevice`).* `CMakeLists.txt` sets `CMAKE_CUDA_ARCHITECTURES 86` *after* `project()`, by which point CMake has already defined it from the compiler default (75). Binaries contain sm_75 SASS + compute_75 PTX, so on the sm_86 GPU every kernel is PTX-JIT-compiled. Since the toolkit moved to 13.4 while the driver supports 13.2, JIT fails ("PTX was compiled with an unsupported toolchain") and 33/59 tests fail. Confirmed fix: configuring with `-DCMAKE_CUDA_ARCHITECTURES=86` → 59/59 pass. Backlog W.1.
 2. **`verify.sh` diffs against `HEAD`**, so on a task branch with committed work the memcheck/format steps see no changes. Must diff against the merge-base with `main`. Backlog W.2.
 3. **Character segmentation under-splits**: 903 chars / 348 words ≈ 2.6 chars/word on the sample (English averages ~4.7) — touching glyphs merge under the 1-blank-column rule. Low impact: line-level CTC recognition does not need char boxes.
 4. **Deskew only rotates the binary image.** A recognizer needs the deskewed *grayscale* image. Backlog M3.3.
