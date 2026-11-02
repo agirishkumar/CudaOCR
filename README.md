@@ -7,8 +7,9 @@ Libraries (NPP) appear only as benchmark baselines.
 
 **Status (2026-11):** end-to-end OCR works — GPU preprocessing, deskew and line
 detection, then PP-OCRv5 line recognition through ONNX Runtime (CUDA or CPU) and
-CTC decoding. Character error rate on the synthetic test pages is under 1%.
-Next: accuracy report and preprocessing tuning (M3), then JSON/hOCR/config (M4).
+CTC decoding. Character error rate (`benchmarks/ACCURACY.md`): 0.21 % on 50
+synthetic pages, 0.94 % on a clean typeset book page, 5.0 % across the real
+scans (noisy/stained ones included). Next: JSON/hOCR/config/CI (M4).
 Goal: a functional, modular OCR whose parts can be swapped or optimized later —
 not a state-of-the-art competitor.
 

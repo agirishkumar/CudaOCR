@@ -60,7 +60,8 @@ class PolarityStage final : public ImageStage {
     Status run(const DeviceImage& in, DeviceImage& out, StageContext& ctx) override;
 };
 
-// "adaptive": local-mean threshold; blockSize odd >= 3 (default 31), C (default 10).
+// "adaptive": local-mean threshold; blockSize odd >= 3 (default 31), C (default 40):
+// a pixel is ink if it is more than C levels darker than its local mean.
 class AdaptiveBinarizer final : public ImageStage {
   public:
     static Result<std::unique_ptr<AdaptiveBinarizer>> create(const Params& p);
