@@ -6,7 +6,7 @@ Rules
 - Acceptance criteria must be machine-checkable. Add/split tasks freely; never reorder or delete a checked task.
 - Unchecked tasks may be moved between milestones; leave a "→ moved to" note.
 
-Active milestone: **MOD** (W complete) → then **M3**
+Active milestone: **MOD** (W.3 first — small, unblocks clean diffs) → then **M3**
 
 ## M0 — Re-foundation ✅ (2026-06-11)
 
@@ -47,9 +47,12 @@ Active milestone: **MOD** (W complete) → then **M3**
 - [x] **W.2 Branch-aware verify gate.** `verify.sh` computes changed files as `git diff --name-only $(git merge-base HEAD origin/main)` ∪ working tree, so memcheck/format run on everything the PR touches; add a `--full` flag (memcheck all tests regardless).
   *Accept:* on a branch with a committed `.cu` change and clean tree, `verify.sh` runs memcheck and format on that file; on `main` with clean tree it skips them.
 
+- [ ] **W.3 Format the whole tree once.** 16 files predate clang-format enforcement (found by the W.2 gate during MOD.1); format them in one whitespace-only PR so later task diffs stay clean. Add `verify.sh --all-format` to check every tracked source.
+  *Accept:* `git diff -w` of the PR shows only line re-wrapping; `verify.sh --all-format` passes; all tests green.
+
 ## MOD — Modular core (no behavior change; makes every later task a drop-in)
 
-- [ ] **MOD.1 Result types.** `include/cudaocr/types.hpp` (host-only): `BBox`, `WordResult{box, text, conf}`, `LineResult{box, words, text, conf}`, `PageResult{lines, skewDeg, inverted, timings}`. Conversion from existing `TextLine`.
+- [x] **MOD.1 Result types.** `include/cudaocr/types.hpp` (host-only): `BBox`, `WordResult{box, text, conf}`, `LineResult{box, words, text, conf}`, `PageResult{lines, skewDeg, inverted, timings}`. Conversion from existing `TextLine`.
   *Accept:* unit tests for construction/conversion; header compiles in a `.cpp` TU without nvcc.
 - [ ] **MOD.2 Component interfaces.** `include/cudaocr/components/`: `ImageStage` (DeviceImage→DeviceImage), `TextDetector` (binary DeviceImage→`vector<LineRegion>`), `LineRecognizer` (gray DeviceImage + regions → `Logits`), `Decoder` (`Logits`→text+conf), `Formatter` (`PageResult`→string). Each with `name()` and `Status`-returning methods; a `Params` key/value map type with typed getters + validation errors.
   *Accept:* interface headers compile; `Params` unit tests (missing key → default, bad type → `InvalidArgument`).
