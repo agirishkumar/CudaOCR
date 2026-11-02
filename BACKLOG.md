@@ -70,7 +70,7 @@ Active milestone: **M3** (MOD complete)
   *Accept:* unit tests on known pairs (identical → 0, one substitution, insert/delete, empty strings, UTF-8 multi-byte).
 - [x] **M3.3 Gray deskew path.** Pipeline keeps the deskewed gray image (same angle as binary) for recognition; `--dump-stages` writes it.
   *Accept:* test — rotating gray and binary with the detected angle yields aligned images (binary of rotated gray ≈ rotated binary within documented tolerance).
-- [ ] **M3.4 ONNX Runtime dependency.** CMake option `CUDAOCR_WITH_ORT` (default ON): download prebuilt `onnxruntime-linux-x64-gpu_cuda13-<ver>.tgz` (≥1.27, SHA-256 pinned) via FetchContent; imported target; core lib still builds with it OFF.
+- [x] **M3.4 ONNX Runtime dependency.** CMake option `CUDAOCR_WITH_ORT` (default ON): download prebuilt `onnxruntime-linux-x64-gpu_cuda13-<ver>.tgz` (≥1.27, SHA-256 pinned) via FetchContent; imported target; core lib still builds with it OFF.
   *Accept:* smoke test runs a tiny committed ONNX model (e.g. Add/Identity) on CPU EP and CUDA EP and gets the expected output; `-DCUDAOCR_WITH_ORT=OFF` build + ctest green.
 - [ ] **M3.5 Model fetch + model card.** `scripts/fetch_models.sh` downloads PP-OCRv5 English `rec.onnx` + `dict.txt` into `models/` (gitignored), verifies SHA-256. Document in `models/README.md`: input name/shape/normalization, output shape, dictionary size + blank index, ONNX op list (sizes M5).
   *Accept:* a test (skipped with a clear message if models absent) loads the model and asserts the documented I/O shapes.
@@ -78,7 +78,7 @@ Active milestone: **M3** (MOD complete)
   *Accept:* max abs diff ≤ 1e-4 vs oracle on fixture lines; memcheck clean.
 - [ ] **M3.7 CTC greedy decoder.** `CtcGreedyDecoder` implements `Decoder`: argmax per timestep, collapse repeats, drop blank, map via dictionary; confidence = mean max-prob of emitted chars; keeps per-char timestep for later word-box alignment.
   *Accept:* unit tests on hand-built logits (repeats, blanks between repeats, all-blank → empty, unknown index → error).
-- [ ] **M3.8 OnnxLineRecognizer.** Implements `LineRecognizer`; batches lines (configurable max batch/width), EP from params (`cuda`|`cpu`), session created once per Pipeline.
+- [ ] **M3.8 OnnxLineRecognizer.** Implements `LineRecognizer`; batches lines (configurable max batch/width), EP from params (`cuda`|`cpu`), session created once per Pipeline. Note (M3.4): create the `Ort::Env` before any `CreateCUDAProviderOptions` call.
   *Accept:* on a rendered single-line fixture ("The quick brown fox jumps over the lazy dog") greedy-decoded text matches exactly on both EPs; CPU and CUDA logits agree within 1e-3.
 - [ ] **M3.9 End-to-end text + txt formatter.** Wire recognizer+decoder into `Pipeline`; `TxtFormatter`; CLI prints text to stdout or `-o file.txt`; exit code 3 when no text.
   *Accept:* integration test — CER ≤ 5% on committed clean synthetic pages; `cudaocr resources/sample.png` exits 0 with non-empty output.

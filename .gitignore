@@ -1,8 +1,21 @@
-build/
+# Build trees (any build*/ dir, e.g. build-noort/) and editor/tool caches
+/build*/
+.cache/
 output/
 *.o
 *.log
-.cache/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Fetched model weights (scripts/fetch_models.sh, M3.5); the model card is tracked
+/models/*
+!/models/README.md
+
+# Externally provided ONNX Runtime trees (CUDAOCR_ORT_ROOT) if unpacked in-repo
+/third_party/onnxruntime*/
 
 # Local Claude Code config (not part of the project)
 .claude/
