@@ -46,7 +46,6 @@ Priorities, in order:
 
 - **Recognition — the core of OCR.** The pipeline finds lines and words but cannot read them. No text is produced yet.
 - Text output formats (txt/hOCR), config file, accuracy measurement (no ground-truth harness, no CER/WER numbers).
-- Modular component interfaces: stages are free functions hard-wired in `runPipeline`; swapping an implementation means editing the pipeline.
 - Performance follow-ups: median is 27× slower than NPP (M1.9 → M6), Gaussian 2.75× (M1.10 → M6).
 - GPU connected-component labeling (M2.5 → M6; not needed for line-level recognition, see §5 Stage 4).
 
@@ -58,6 +57,8 @@ Priorities, in order:
 4. **Deskew only rotates the binary image.** A recognizer needs the deskewed *grayscale* image. Backlog M3.3.
 5. **Projection-profile layout assumes a single text column.** Multi-column pages, tables, and figures interleave lines. Accepted for v1; the `TextDetector` interface lets a learned detector (DBNet) replace it in M6.
 6. Toolchain drift since June: system now has CUDA toolkit 13.4 (13.1 also installed), driver 595.99 (CUDA 13.2), default host compiler g++ 15.2 (g++-13 removed). The build works with these once #1 is fixed.
+7. ~~**Default-stream transfers raced pipeline kernels.**~~ *Fixed in MOD.4.* Pipeline streams are non-blocking, but uploads/downloads/zero-fills used the default stream, so e.g. the polarity histogram could read a half-uploaded image (~1 in 3 runs) and pipeline tests were order-dependent. Regression tests: `StreamOrdering.*`.
+8. **Default thresholding is weak on noisy scans** (`noisy_text2.png`: 2 lines with defaults vs 9 with `--otsu`). Backlog M3.11.
 
 ## 5. Full product specification (features by pipeline stage)
 
@@ -125,8 +126,8 @@ Ordering principle: **functional end-to-end first, then usable, then custom/opti
 | **M1** Preprocessing | Custom preprocessing kernels + oracles + NPP benchmarks | ✅ done (M1.9/M1.10 perf → M6) |
 | **M2** Layout | Hough deskew, GPU rotate, projection line/word segmentation | ✅ done (M2.5 CCL → M6) |
 | **W** Workflow fixes | Fix CUDA arch default; branch-aware `verify.sh` | ✅ done |
-| **MOD** Modular core | Result types, component interfaces, registry, Pipeline built from config; existing stages wrapped with zero behavior change | ⏳ next |
-| **M3** Functional OCR | Ground-truth fixtures + CER tool, ORT dependency, line crop/normalize kernel, ONNX recognizer, CTC decoder, txt output, accuracy baseline | ⏳ |
+| **MOD** Modular core | Result types, component interfaces, registry, Pipeline built from config; existing stages wrapped with zero behavior change | ✅ done |
+| **M3** Functional OCR | Ground-truth fixtures + CER tool, ORT dependency, line crop/normalize kernel, ONNX recognizer, CTC decoder, txt output, accuracy baseline | ⏳ next |
 | **M4** Usable product | JSON/hOCR output, TOML config, multi-page input, GitHub Actions compile/format CI, README results tables | ⏳ |
 | **M5** Custom recognizer | Hand-written CUDA inference for the recognition model; ORT as oracle | ⏳ |
 | **M6** Optimize & upgrade | Median/Gaussian optimization, DBNet detector swap-in, GPU CCL, beam search, dictionary correction, multi-stream batching | backlog |
