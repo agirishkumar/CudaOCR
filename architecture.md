@@ -95,7 +95,8 @@ No system packages are required beyond the CUDA toolkit and a C++20 compiler (Op
 | **Registry / factory** | `ComponentRegistry`: string name → factory(`Params`) | Config selects implementations by name; adding an implementation = one class + one registration line, zero `Pipeline` edits. |
 | **RAII wrappers** | `core/` (DeviceImage, Stream, Event, PinnedBuffer) | Memory/stream safety; exception-safe early returns. |
 | **Builder-ish config** | `PipelineConfig` assembled from TOML + CLI overrides, validated once | One validation point; stages receive already-valid params. |
-| **Decorator-style timing** | `Pipeline` wraps every component call in a CUDA-event timer | Per-stage timing without each component re-implementing it (replaces the earlier `StageBase` template-method idea). |
+| **Decorator-style timing** | `Pipeline` wraps every component call in a CUDA-event timer, named after the component | Per-stage timing without each component re-implementing it (replaces the earlier `StageBase` template-method idea). |
+| **Pimpl** | `Pipeline::Impl` holds the stream and device buffers | Keeps `pipeline.hpp` host-only so the CLI, formatters and bindings don't need CUDA headers. |
 | **Oracle/golden-master testing** | tests | The core TDD enabler for numeric GPU code. |
 
 Anti-choices: no singleton (Logger becomes an injected/explicit handle internally; the static facade remains only at the CLI edge), no inheritance-heavy hierarchy beyond `StageBase`, no premature plugin system.
@@ -231,7 +232,8 @@ GPU determinism note: kernels that use `atomicAdd` on floats or reduction order 
 
 ## 10. Performance architecture
 
-- **Streams**: one `Stream` per pipeline run; H2D/D2H async via pinned staging buffers. Multi-image batch mode (stretch) = N streams round-robin.
+- **Streams**: one `Stream` per `Pipeline` (non-blocking); H2D/D2H async via pinned staging buffers (planned). Multi-image batch mode (stretch) = N streams round-robin.
+- **Stream-ordering rule** (decision #20): every memset/memcpy/upload/download takes the caller's `cudaStream_t`. Non-blocking streams do not synchronize with the legacy default stream, so a default-stream operation next to pipeline kernels is a race. `StreamOrdering.*` tests guard this.
 - **Memory**: pitched allocations for 2D images (coalescing); a simple size-bucketed `DeviceImage` pool inside `Pipeline` to stop per-run malloc churn (added only when benchmarks justify — principle §4.6).
 - **Constant memory** for small LUTs (sin/cos tables for Hough — also fixes the per-thread recompute inefficiency).
 - **Shared memory** tiles for separable Gaussian and median (the failed texture-memory experiment from the README is re-attempted later as a benchmark-driven task, not redone blindly).
@@ -262,6 +264,9 @@ GPU determinism note: kernels that use `atomicAdd` on floats or reduction order 
 | 18 | 2026-11-02 | One branch + one PR per backlog task; user merges; branches deleted after merge; `CLAUDE.md`/`.claude/` gitignored; no AI co-author trailers | commit straight to `main` | User direction; PRs give a reviewable unit per task and a clean history (§13). |
 
 | 19 | 2026-11-02 | Interface details (refines #15): detectors return geometry-only `LineResult`s (no separate `LineRegion` type); deskew is its own `Deskewer` interface (estimate once, apply to binary and gray); stages write page metadata through `StageContext::page`; recognizers emit CTC *probabilities* (`CtcProbs`); `Params` stores text and parses on read | `LineRegion` type; deskew as an `ImageStage`; side-output structs per stage; typed `std::variant` params | Fewer types to keep in sync; deskew genuinely needs two outputs from one estimate; a page sink keeps stage signatures uniform; text params match their CLI/TOML origin and give one uniform error for bad values. |
+
+| 20 | 2026-11-02 | All device transfers/fills are ordered on the caller's stream (`zero/upload/download/fromHost(…, stream)`) | make pipeline streams blocking; sync the device around transfers | Found as a real race (MOD.4). Blocking streams would hide it but serialize against any default-stream work; explicit stream arguments keep ordering visible and enable future multi-stream batching. |
+| 21 | 2026-11-02 | Replace-and-pin refactors: prove new == old directly, then freeze old outputs as a golden table (counts + FNV digest of all boxes) before deleting the old code | keep the old implementation as a permanent oracle | The direct comparison found a real bug; the golden table keeps the guarantee without carrying dead code. Intentional behavior changes must regenerate the table and say why. |
 
 *(Append new rows; never delete — supersede with a new row referencing the old.)*
 

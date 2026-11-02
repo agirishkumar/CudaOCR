@@ -138,6 +138,7 @@ Status OtsuBinarizer::run(const DeviceImage& in, DeviceImage& out, StageContext&
     auto t = otsuThreshold(in, ctx.stream);
     if (!t.ok()) return t.status();
     lastThreshold_ = t.value();
+    if (ctx.page) ctx.page->metrics["otsu.threshold"] = t.value();
     Status s = prepareOut(in, out, 1);
     if (!s.ok()) return s;
     return applyThreshold(in, out, t.value(), ctx.stream);

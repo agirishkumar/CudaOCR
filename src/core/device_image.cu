@@ -70,27 +70,29 @@ Status DeviceImage::copyTo(DeviceImage& dst, cudaStream_t stream) const {
     return Status::Good();
 }
 
-Result<DeviceImage> DeviceImage::fromHost(const HostImage& host) {
+Result<DeviceImage> DeviceImage::fromHost(const HostImage& host, cudaStream_t stream) {
     auto img = create(host.width, host.height, host.channels);
     if (!img.ok()) return img.status();
-    Status s = img.value().upload(host);
+    Status s = img.value().upload(host, stream);
     if (!s.ok()) return s;
     return img;
 }
 
-Status DeviceImage::upload(const HostImage& host) {
+Status DeviceImage::upload(const HostImage& host, cudaStream_t stream) {
     if (host.width != width_ || host.height != height_ || host.channels != channels_) {
         return Status::Error(ErrorCode::InvalidArgument, "DeviceImage::upload: shape mismatch");
     }
-    CUDAOCR_CHECK(cudaMemcpy2D(data_, pitch_, host.data.data(), host.rowBytes(), host.rowBytes(),
-                               height_, cudaMemcpyHostToDevice));
+    CUDAOCR_CHECK(cudaMemcpy2DAsync(data_, pitch_, host.data.data(), host.rowBytes(),
+                                    host.rowBytes(), height_, cudaMemcpyHostToDevice, stream));
+    CUDAOCR_CHECK(cudaStreamSynchronize(stream));
     return Status::Good();
 }
 
-Status DeviceImage::download(HostImage& host) const {
+Status DeviceImage::download(HostImage& host, cudaStream_t stream) const {
     host = HostImage::create(width_, height_, channels_);
-    CUDAOCR_CHECK(cudaMemcpy2D(host.data.data(), host.rowBytes(), data_, pitch_, host.rowBytes(),
-                               height_, cudaMemcpyDeviceToHost));
+    CUDAOCR_CHECK(cudaMemcpy2DAsync(host.data.data(), host.rowBytes(), data_, pitch_,
+                                    host.rowBytes(), height_, cudaMemcpyDeviceToHost, stream));
+    CUDAOCR_CHECK(cudaStreamSynchronize(stream));
     return Status::Good();
 }
 

@@ -45,25 +45,35 @@ void drawRect(HostImage& img, int x0, int y0, int x1, int y1, std::uint8_t r, st
     }
 }
 
-std::string toJson(const PipelineResult& res) {
+int glyphCount(const PageResult& page) {
+    int n = 0;
+    for (const auto& l : page.lines)
+        for (const auto& w : l.words) n += static_cast<int>(w.glyphs.size());
+    return n;
+}
+
+std::string boxJson(const BBox& b) {
+    return "\"x0\": " + std::to_string(b.x0) + ", \"y0\": " + std::to_string(b.y0) +
+           ", \"x1\": " + std::to_string(b.x1) + ", \"y1\": " + std::to_string(b.y1);
+}
+
+std::string toJson(const PageResult& res) {
     std::string j = "{\n";
-    j += "  \"skewAngleDeg\": " + std::to_string(res.skewAngleDeg) + ",\n";
-    j += "  \"wasInverted\": " + std::string(res.wasInverted ? "true" : "false") + ",\n";
-    if (res.otsuThreshold >= 0)
-        j += "  \"otsuThreshold\": " + std::to_string(res.otsuThreshold) + ",\n";
+    j += "  \"skewAngleDeg\": " + std::to_string(res.skewDeg) + ",\n";
+    j += "  \"wasInverted\": " + std::string(res.inverted ? "true" : "false") + ",\n";
+    for (const auto& [key, value] : res.metrics)
+        j += "  \"" + key + "\": " + std::to_string(value) + ",\n";
     j += "  \"lineCount\": " + std::to_string(res.lines.size()) + ",\n";
-    j += "  \"wordCount\": " + std::to_string(res.wordCount) + ",\n";
-    j += "  \"charCount\": " + std::to_string(res.charCount) + ",\n";
+    j += "  \"wordCount\": " + std::to_string(res.wordCount()) + ",\n";
+    j += "  \"charCount\": " + std::to_string(glyphCount(res)) + ",\n";
     j += "  \"lines\": [\n";
     for (size_t i = 0; i < res.lines.size(); ++i) {
         const auto& line = res.lines[i];
-        j += "    {\"y0\": " + std::to_string(line.y0) + ", \"y1\": " + std::to_string(line.y1) +
-             ", \"words\": [";
+        j += "    {" + boxJson(line.box) + ", \"words\": [";
         for (size_t wi = 0; wi < line.words.size(); ++wi) {
             const auto& w = line.words[wi];
-            j += "\n      {\"x0\": " + std::to_string(w.x0) + ", \"y0\": " + std::to_string(w.y0) +
-                 ", \"x1\": " + std::to_string(w.x1) + ", \"y1\": " + std::to_string(w.y1) +
-                 ", \"chars\": " + std::to_string(w.chars.size()) + "}";
+            j += "\n      {" + boxJson(w.box) + ", \"chars\": " + std::to_string(w.glyphs.size()) +
+                 "}";
             if (wi + 1 < line.words.size()) j += ",";
         }
         j += "]}";
@@ -79,6 +89,34 @@ std::string toJson(const PipelineResult& res) {
     return j;
 }
 
+// CLI knobs, kept as text so the components' Params validation reports bad
+// values (e.g. "--median 4") instead of atoi silently turning them into 0.
+struct Knobs {
+    std::string median = "3";  // "0" = off
+    bool equalize = false;
+    bool otsu = false;
+    std::string blockSize, C;  // empty = component default
+    bool deskew = true;
+};
+
+PipelineConfig toConfig(const Knobs& k) {
+    PipelineConfig cfg;
+    cfg.preprocess.clear();
+    if (k.equalize) cfg.preprocess.push_back({"equalize", {}});
+    if (k.median != "0") cfg.preprocess.push_back({"median", Params().set("k", k.median)});
+    cfg.preprocess.push_back({"polarity", {}});
+    if (k.otsu) {
+        cfg.binarizer = {"otsu", {}};
+    } else {
+        Params p;
+        if (!k.blockSize.empty()) p.set("blockSize", k.blockSize);
+        if (!k.C.empty()) p.set("C", k.C);
+        cfg.binarizer = {"adaptive", p};
+    }
+    if (!k.deskew) cfg.deskewer.reset();
+    return cfg;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -87,7 +125,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     std::string input, jsonOut, dumpDir;
-    PipelineConfig cfg;
+    Knobs knobs;
     bool benchmark = false;
     LogLevel level = LogLevel::Info;
 
@@ -99,17 +137,17 @@ int main(int argc, char** argv) {
         } else if (a == "--dump-stages") {
             if (const char* v = next()) dumpDir = v;
         } else if (a == "--otsu") {
-            cfg.useOtsu = true;
+            knobs.otsu = true;
         } else if (a == "--block-size") {
-            if (const char* v = next()) cfg.blockSize = std::atoi(v);
+            if (const char* v = next()) knobs.blockSize = v;
         } else if (a == "--C") {
-            if (const char* v = next()) cfg.C = std::atoi(v);
+            if (const char* v = next()) knobs.C = v;
         } else if (a == "--median") {
-            if (const char* v = next()) cfg.medianK = std::atoi(v);
+            if (const char* v = next()) knobs.median = v;
         } else if (a == "--equalize") {
-            cfg.equalize = true;
+            knobs.equalize = true;
         } else if (a == "--no-deskew") {
-            cfg.deskew = false;
+            knobs.deskew = false;
         } else if (a == "--benchmark") {
             benchmark = true;
         } else if (a == "--log-level") {
@@ -149,20 +187,28 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    auto pipeline = Pipeline::create(toConfig(knobs));
+    if (!pipeline.ok()) {
+        std::fprintf(stderr, "config error: %s\n", pipeline.status().message.c_str());
+        return 1;
+    }
     const bool keepStages = !dumpDir.empty();
-    auto res = runPipeline(img.value(), cfg, keepStages);
+    StageImages stages;
+    auto res = pipeline.value().run(img.value(), keepStages ? &stages : nullptr);
     if (!res.ok()) {
         std::fprintf(stderr, "pipeline error: %s\n", res.status().message.c_str());
         return 2;
     }
-    const PipelineResult& r = res.value();
+    const PageResult& r = res.value();
 
     std::printf("image:        %dx%d (%d channel%s)\n", img.value().width, img.value().height,
                 img.value().channels, img.value().channels > 1 ? "s" : "");
-    std::printf("skew angle:   %+.2f deg%s\n", r.skewAngleDeg, cfg.deskew ? " (corrected)" : "");
-    if (r.otsuThreshold >= 0) std::printf("otsu thresh:  %d\n", r.otsuThreshold);
-    std::printf("polarity:     %s\n", r.wasInverted ? "light-on-dark (inverted)" : "dark-on-light");
-    std::printf("lines: %zu   words: %d   chars: %d\n", r.lines.size(), r.wordCount, r.charCount);
+    std::printf("skew angle:   %+.2f deg%s\n", r.skewDeg, knobs.deskew ? " (corrected)" : "");
+    if (auto it = r.metrics.find("otsu.threshold"); it != r.metrics.end())
+        std::printf("otsu thresh:  %d\n", static_cast<int>(it->second));
+    std::printf("polarity:     %s\n", r.inverted ? "light-on-dark (inverted)" : "dark-on-light");
+    std::printf("lines: %zu   words: %d   chars: %d\n", r.lines.size(), r.wordCount(),
+                glyphCount(r));
     if (benchmark) {
         std::printf("\n%-20s %10s\n", "stage", "ms");
         float total = 0;
@@ -186,21 +232,22 @@ int main(int argc, char** argv) {
             Status s = saveImage(dumpDir + "/" + name, im);
             if (!s.ok()) std::fprintf(stderr, "warn: %s\n", s.message.c_str());
         };
-        save("01_gray.png", r.gray);
-        save("02_binary.png", r.binary);
-        save("03_deskewed.png", r.deskewed);
+        save("01_gray.png", stages.gray);
+        save("02_binary.png", stages.binary);
+        save("03_deskewed.png", stages.deskewed);
         // Overlay: deskewed binary as RGB with line bands (blue), words (red), chars (green).
-        if (!r.deskewed.empty()) {
-            HostImage overlay = HostImage::create(r.deskewed.width, r.deskewed.height, 3);
+        if (!stages.deskewed.empty()) {
+            const HostImage& base = stages.deskewed;
+            HostImage overlay = HostImage::create(base.width, base.height, 3);
             for (int y = 0; y < overlay.height; ++y)
                 for (int x = 0; x < overlay.width; ++x)
-                    for (int c = 0; c < 3; ++c) overlay.at(x, y, c) = r.deskewed.at(x, y);
+                    for (int c = 0; c < 3; ++c) overlay.at(x, y, c) = base.at(x, y);
             for (const auto& line : r.lines) {
-                drawRect(overlay, 0, line.y0, overlay.width - 1, line.y1, 80, 80, 255);
+                drawRect(overlay, 0, line.box.y0, overlay.width - 1, line.box.y1, 80, 80, 255);
                 for (const auto& w : line.words) {
-                    for (const auto& cbox : w.chars)
-                        drawRect(overlay, cbox.x0, cbox.y0, cbox.x1, cbox.y1, 0, 200, 0);
-                    drawRect(overlay, w.x0, w.y0, w.x1, w.y1, 255, 0, 0);
+                    for (const auto& g : w.glyphs)
+                        drawRect(overlay, g.x0, g.y0, g.x1, g.y1, 0, 200, 0);
+                    drawRect(overlay, w.box.x0, w.box.y0, w.box.x1, w.box.y1, 255, 0, 0);
                 }
             }
             save("04_overlay.png", overlay);

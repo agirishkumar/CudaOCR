@@ -6,7 +6,7 @@ Rules
 - Acceptance criteria must be machine-checkable. Add/split tasks freely; never reorder or delete a checked task.
 - Unchecked tasks may be moved between milestones; leave a "→ moved to" note.
 
-Active milestone: **MOD** (MOD.2 next) → then **M3**
+Active milestone: **M3** (MOD complete)
 
 ## M0 — Re-foundation ✅ (2026-06-11)
 
@@ -58,7 +58,7 @@ Active milestone: **MOD** (MOD.2 next) → then **M3**
   *Accept:* interface headers compile; `Params` unit tests (missing key → default, bad type → `InvalidArgument`).
 - [x] **MOD.3 Wrap existing stages.** `ImageStage`s: `GrayscaleStage`, `EqualizeStage`, `MedianStage`, `GaussianStage`, `PolarityStage` (sets `page->inverted`), `AdaptiveBinarizer`, `OtsuBinarizer`; `Deskewer`: `HoughDeskewer`; `TextDetector`: `ProjectionDetector` (returns `toLineResults(...)`). Each takes `Params` and validates with `requireKnown`. Thin adapters over existing kernels — kernels untouched.
   *Accept:* per-adapter tests: output identical to calling the underlying free function.
-- [ ] **MOD.4 Registry + config-built Pipeline.** `ComponentRegistry` (name → factory); `PipelineConfig{preprocess: [ {name, params} ], binarizer, deskew, detector, recognizer?, decoder?, formatter}`; `Pipeline::create(cfg)` validates once; `Pipeline::run(HostImage) → PageResult` with per-component CUDA-event timing; CLI flags map onto the config.
+- [x] **MOD.4 Registry + config-built Pipeline.** `ComponentRegistry` (name → factory); `PipelineConfig{preprocess: [ {name, params} ], binarizer, deskew, detector, recognizer?, decoder?, formatter}`; `Pipeline::create(cfg)` validates once; `Pipeline::run(HostImage) → PageResult` with per-component CUDA-event timing; CLI flags map onto the config.
   *Accept:* golden-equivalence test — new `Pipeline` reproduces `runPipeline` lines/words/skew exactly on all existing pipeline fixtures; unknown component name → `InvalidArgument` naming it; then `runPipeline` is deleted and all tests stay green.
 
 ## M3 — Functional OCR (text out)
@@ -83,6 +83,9 @@ Active milestone: **MOD** (MOD.2 next) → then **M3**
   *Accept:* integration test — CER ≤ 5% on committed clean synthetic pages; `cudaocr resources/sample.png` exits 0 with non-empty output.
 - [ ] **M3.10 Accuracy baseline report.** Run eval on all synthetic variants + 1–2 hand-transcribed `resources/` pages; write `benchmarks/ACCURACY.md`; add a ratchet test that fails if clean-synthetic CER regresses by > 1 point.
   *Accept:* report committed; ratchet test green.
+
+- [ ] **M3.11 Default preprocessing on noisy scans.** Found during MOD.4: with defaults (median 3 + adaptive 31/10) `noisy_text2.png` yields 2 lines vs 9 with Otsu, `noisy_text.png` 3 vs 4. Using the M3.10 CER harness, pick defaults (or an auto-select rule) that maximize recognized text on `resources/` without regressing clean pages; update `PipelineGolden` deliberately with the reason.
+  *Accept:* aggregate CER on `resources/` improves vs M3.10 baseline; clean-synthetic CER unchanged.
 
 ## M4 — Usable product
 

@@ -95,7 +95,7 @@ Result<float> detectSkewAngle(const DeviceImage& bin, float maxAngleDeg, float s
 
     auto acc = DeviceBuffer<int>::create(static_cast<size_t>(rhoBins) * numTheta);
     if (!acc.ok()) return acc.status();
-    Status s = acc.value().zero();
+    Status s = acc.value().zero(stream);
     if (!s.ok()) return s;
 
     const dim3 block(32, 8);
@@ -106,7 +106,7 @@ Result<float> detectSkewAngle(const DeviceImage& bin, float maxAngleDeg, float s
     CUDAOCR_CHECK_R(cudaStreamSynchronize(stream));
 
     std::vector<int> h_acc;
-    s = acc.value().download(h_acc);
+    s = acc.value().download(h_acc, stream);
     if (!s.ok()) return s;
 
     const auto it = std::max_element(h_acc.begin(), h_acc.end());

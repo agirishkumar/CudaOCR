@@ -50,7 +50,7 @@ Result<std::vector<unsigned int>> histogram256(const DeviceImage& gray, cudaStre
         return Status::Error(ErrorCode::InvalidArgument, "histogram256: 1-channel only");
     auto d_hist = DeviceBuffer<unsigned int>::create(256);
     if (!d_hist.ok()) return d_hist.status();
-    Status s = d_hist.value().zero();
+    Status s = d_hist.value().zero(stream);
     if (!s.ok()) return s;
 
     const dim3 block(32, 8);
@@ -61,7 +61,7 @@ Result<std::vector<unsigned int>> histogram256(const DeviceImage& gray, cudaStre
     CUDAOCR_CHECK_LAUNCH("histogramKernel");
     CUDAOCR_CHECK_R(cudaStreamSynchronize(stream));
     std::vector<unsigned int> hist;
-    s = d_hist.value().download(hist);
+    s = d_hist.value().download(hist, stream);
     if (!s.ok()) return s;
     return hist;
 }
