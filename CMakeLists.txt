@@ -85,6 +85,7 @@ add_executable(unit_tests
   tests/integration/pipeline_test.cu
   tests/integration/pipeline_golden_test.cu
   tests/integration/synth_fixtures_test.cu
+  tests/integration/gray_deskew_test.cu
 )
 target_link_libraries(unit_tests PRIVATE cudaocr_lib gtest gtest_main)
 target_include_directories(unit_tests PRIVATE tests)
