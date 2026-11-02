@@ -37,7 +37,6 @@ add_library(cudaocr_lib STATIC
   src/components/projection_detector.cpp
   src/components/builtin.cpp
   src/pipeline.cu
-  src/legacy_pipeline.cu
 )
 target_include_directories(cudaocr_lib PUBLIC include)
 target_include_directories(cudaocr_lib SYSTEM PUBLIC third_party)
@@ -80,8 +79,7 @@ add_executable(unit_tests
   tests/unit/segment_test.cu
   tests/unit/stage_adapters_test.cu
   tests/integration/pipeline_test.cu
-  tests/integration/pipeline_equivalence_test.cu
-  tests/integration/pipeline_v2_test.cu
+  tests/integration/pipeline_golden_test.cu
 )
 target_link_libraries(unit_tests PRIVATE cudaocr_lib gtest gtest_main)
 target_include_directories(unit_tests PRIVATE tests)
@@ -93,6 +91,19 @@ set_target_properties(unit_tests PROPERTIES
 
 include(GoogleTest)
 gtest_discover_tests(unit_tests DISCOVERY_TIMEOUT 60)
+
+# CLI smoke tests: pin the end-to-end counts on the real sample scan
+# (same numbers as PipelineGolden, through argument parsing and printing).
+add_test(NAME Cli.SampleDefault COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png)
+set_tests_properties(Cli.SampleDefault PROPERTIES
+  PASS_REGULAR_EXPRESSION "lines: 35   words: 348   chars: 903")
+add_test(NAME Cli.SampleOtsuNoDeskew
+         COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png --otsu --no-deskew)
+set_tests_properties(Cli.SampleOtsuNoDeskew PROPERTIES
+  PASS_REGULAR_EXPRESSION "otsu thresh: +[0-9]+.*lines: 35   words: 353   chars: 1436")
+add_test(NAME Cli.BadParamIsConfigError
+         COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png --C abc)
+set_tests_properties(Cli.BadParamIsConfigError PROPERTIES WILL_FAIL TRUE)
 
 # Tooling tests (verify gate helpers).
 add_test(NAME Scripts.ChangedFiles
