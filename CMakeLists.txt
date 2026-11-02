@@ -31,6 +31,7 @@ add_library(cudaocr_lib STATIC
   src/stages/deskew.cu
   src/stages/segment.cu
   src/stages/segment_types.cpp
+  src/components/params.cpp
   src/pipeline.cu
 )
 target_include_directories(cudaocr_lib PUBLIC include)
@@ -61,6 +62,8 @@ add_executable(unit_tests
   tests/unit/logger_test.cpp
   tests/unit/host_image_test.cpp
   tests/unit/types_test.cpp
+  tests/unit/params_test.cpp
+  tests/unit/components_test.cpp
   tests/unit/device_test.cu
   tests/unit/grayscale_test.cu
   tests/unit/filters_test.cu
