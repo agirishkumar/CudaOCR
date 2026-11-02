@@ -19,7 +19,7 @@ lastFailure: (none)
 - W.3, 2026-11-02, "style: clang-format the whole tree; add verify.sh --all-format (W.3)"
 
 ## AWAITING-MERGE
-(none)
+- PR #4 https://github.com/agirishkumar/CudaOCR/pull/4 (task/W.3-format-tree)
 
 ## BLOCKED
 (none)
