@@ -6,7 +6,7 @@
 
 #include "cudaocr/core/host_image.hpp"
 #include "cudaocr/core/logger.hpp"
-#include "cudaocr/pipeline.hpp"
+#include "cudaocr/legacy_pipeline.hpp"
 
 namespace {
 
@@ -45,7 +45,7 @@ void drawRect(HostImage& img, int x0, int y0, int x1, int y1, std::uint8_t r, st
     }
 }
 
-std::string toJson(const PipelineResult& res) {
+std::string toJson(const LegacyPipelineResult& res) {
     std::string j = "{\n";
     j += "  \"skewAngleDeg\": " + std::to_string(res.skewAngleDeg) + ",\n";
     j += "  \"wasInverted\": " + std::string(res.wasInverted ? "true" : "false") + ",\n";
@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     std::string input, jsonOut, dumpDir;
-    PipelineConfig cfg;
+    LegacyPipelineConfig cfg;
     bool benchmark = false;
     LogLevel level = LogLevel::Info;
 
@@ -150,12 +150,12 @@ int main(int argc, char** argv) {
     }
 
     const bool keepStages = !dumpDir.empty();
-    auto res = runPipeline(img.value(), cfg, keepStages);
+    auto res = runLegacyPipeline(img.value(), cfg, keepStages);
     if (!res.ok()) {
         std::fprintf(stderr, "pipeline error: %s\n", res.status().message.c_str());
         return 2;
     }
-    const PipelineResult& r = res.value();
+    const LegacyPipelineResult& r = res.value();
 
     std::printf("image:        %dx%d (%d channel%s)\n", img.value().width, img.value().height,
                 img.value().channels, img.value().channels > 1 ? "s" : "");

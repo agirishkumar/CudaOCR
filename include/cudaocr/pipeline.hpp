@@ -1,40 +1,57 @@
 #pragma once
 
-#include <string>
+// Component-based OCR pipeline. The config names each component; the registry
+// turns names into instances once, at create(). Host-only header.
+
+#include <memory>
+#include <optional>
 #include <vector>
 
 #include "cudaocr/core/host_image.hpp"
 #include "cudaocr/core/status.hpp"
-#include "cudaocr/stages/segment_types.hpp"
+#include "cudaocr/registry.hpp"
 #include "cudaocr/types.hpp"
 
 namespace cudaocr {
 
+// Defaults reproduce the original hard-wired pipeline: median 3x3, polarity
+// normalization, adaptive threshold (31, 10), Hough deskew (±15°, 0.25° step),
+// projection-profile detection (min line height 3).
 struct PipelineConfig {
-    int medianK = 3;        // 0 disables denoising; otherwise 3 or 5
-    bool useOtsu = false;   // false = adaptive threshold
-    int blockSize = 31;     // adaptive threshold window (odd)
-    int C = 10;             // adaptive threshold offset
-    bool equalize = false;  // histogram equalization before binarization
-    bool deskew = true;
-    float maxSkewDeg = 15.0f;
-    float skewStepDeg = 0.25f;
-    int minLineHeight = 3;
+    ComponentSpec toGray{"grayscale", {}};  // runs only for 3-channel input
+    std::vector<ComponentSpec> preprocess{{"median", Params().set("k", 3)}, {"polarity", {}}};
+    ComponentSpec binarizer{"adaptive", {}};
+    std::optional<ComponentSpec> deskewer = ComponentSpec{"hough", {}};  // nullopt = skip
+    ComponentSpec detector{"projection", {}};
 };
 
-struct PipelineResult {
-    float skewAngleDeg = 0.0f;
-    int otsuThreshold = -1;  // set when useOtsu
-    bool wasInverted = false;
-    std::vector<TextLine> lines;
-    int wordCount = 0;
-    int charCount = 0;
-    std::vector<StageTime> timings;
-    // Filled when keepStages: intermediate images for inspection.
-    HostImage gray, binary, deskewed;
+// Intermediate images for --dump-stages / debugging.
+struct StageImages {
+    HostImage gray;      // after preprocessing
+    HostImage binary;    // after binarization
+    HostImage deskewed;  // binary after deskew (== binary when deskew is off)
 };
 
-Result<PipelineResult> runPipeline(const HostImage& input, const PipelineConfig& cfg,
-                                   bool keepStages = false);
+class Pipeline {
+  public:
+    // Resolves and validates every component; errors name the config slot,
+    // e.g. "preprocess[1] median: ...".
+    static Result<Pipeline> create(
+        const PipelineConfig& cfg,
+        const ComponentRegistry& registry = ComponentRegistry::withBuiltins());
+
+    // Reusable across pages; device buffers are kept and only reallocated when
+    // the page size changes.
+    Result<PageResult> run(const HostImage& input, StageImages* keep = nullptr);
+
+    Pipeline(Pipeline&&) noexcept;
+    Pipeline& operator=(Pipeline&&) noexcept;
+    ~Pipeline();
+
+  private:
+    struct Impl;
+    explicit Pipeline(std::unique_ptr<Impl> impl);
+    std::unique_ptr<Impl> impl_;
+};
 
 }  // namespace cudaocr

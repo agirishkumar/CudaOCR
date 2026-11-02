@@ -35,7 +35,9 @@ add_library(cudaocr_lib STATIC
   src/components/preprocess.cpp
   src/components/hough_deskewer.cpp
   src/components/projection_detector.cpp
+  src/components/builtin.cpp
   src/pipeline.cu
+  src/legacy_pipeline.cu
 )
 target_include_directories(cudaocr_lib PUBLIC include)
 target_include_directories(cudaocr_lib SYSTEM PUBLIC third_party)
@@ -66,8 +68,10 @@ add_executable(unit_tests
   tests/unit/host_image_test.cpp
   tests/unit/types_test.cpp
   tests/unit/params_test.cpp
+  tests/unit/registry_test.cpp
   tests/unit/components_test.cpp
   tests/unit/device_test.cu
+  tests/unit/stream_ordering_test.cu
   tests/unit/grayscale_test.cu
   tests/unit/filters_test.cu
   tests/unit/binarize_test.cu
@@ -76,6 +80,8 @@ add_executable(unit_tests
   tests/unit/segment_test.cu
   tests/unit/stage_adapters_test.cu
   tests/integration/pipeline_test.cu
+  tests/integration/pipeline_equivalence_test.cu
+  tests/integration/pipeline_v2_test.cu
 )
 target_link_libraries(unit_tests PRIVATE cudaocr_lib gtest gtest_main)
 target_include_directories(unit_tests PRIVATE tests)
