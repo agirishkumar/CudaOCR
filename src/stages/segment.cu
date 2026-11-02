@@ -15,8 +15,8 @@ __global__ void rowProfileKernel(const std::uint8_t* __restrict__ img, size_t pi
     if (img[static_cast<size_t>(y) * pitch + x] < 128) atomicAdd(&rows[y], 1);
 }
 
-__global__ void colProfileKernel(const std::uint8_t* __restrict__ img, size_t pitch, int w,
-                                 int y0, int y1, int* __restrict__ cols) {
+__global__ void colProfileKernel(const std::uint8_t* __restrict__ img, size_t pitch, int w, int y0,
+                                 int y1, int* __restrict__ cols) {
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
     const int y = y0 + blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= w || y > y1) return;
@@ -33,10 +33,9 @@ Result<std::vector<int>> rowProfile(const DeviceImage& bin, cudaStream_t stream)
     Status s = d_rows.value().zero();
     if (!s.ok()) return s;
     const dim3 block(32, 8);
-    const dim3 grid((bin.width() + block.x - 1) / block.x,
-                    (bin.height() + block.y - 1) / block.y);
-    rowProfileKernel<<<grid, block, 0, stream>>>(bin.data(), bin.pitch(), bin.width(),
-                                                 bin.height(), d_rows.value().data());
+    const dim3 grid((bin.width() + block.x - 1) / block.x, (bin.height() + block.y - 1) / block.y);
+    rowProfileKernel<<<grid, block, 0, stream>>>(bin.data(), bin.pitch(), bin.width(), bin.height(),
+                                                 d_rows.value().data());
     CUDAOCR_CHECK_R(cudaGetLastError());
     CUDAOCR_CHECK_R(cudaStreamSynchronize(stream));
     std::vector<int> rows;

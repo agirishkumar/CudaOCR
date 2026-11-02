@@ -17,7 +17,7 @@ class Logger {
     static void close();
     static void setLevel(LogLevel minLevel);
     static LogLevel level();
-    static void setSink(Sink sink);   // pass nullptr to restore the default sink
+    static void setSink(Sink sink);  // pass nullptr to restore the default sink
     static void log(LogLevel level, const std::string& message);
 
     static const char* levelName(LogLevel level);

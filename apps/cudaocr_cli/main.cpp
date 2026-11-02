@@ -159,8 +159,7 @@ int main(int argc, char** argv) {
 
     std::printf("image:        %dx%d (%d channel%s)\n", img.value().width, img.value().height,
                 img.value().channels, img.value().channels > 1 ? "s" : "");
-    std::printf("skew angle:   %+.2f deg%s\n", r.skewAngleDeg,
-                cfg.deskew ? " (corrected)" : "");
+    std::printf("skew angle:   %+.2f deg%s\n", r.skewAngleDeg, cfg.deskew ? " (corrected)" : "");
     if (r.otsuThreshold >= 0) std::printf("otsu thresh:  %d\n", r.otsuThreshold);
     std::printf("polarity:     %s\n", r.wasInverted ? "light-on-dark (inverted)" : "dark-on-light");
     std::printf("lines: %zu   words: %d   chars: %d\n", r.lines.size(), r.wordCount, r.charCount);

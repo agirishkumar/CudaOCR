@@ -197,7 +197,7 @@ Rules: components never call each other directly — only `Pipeline` composes th
 1. Configure+build clean: `cmake --build build -j` → zero errors, zero *new* warnings.
 2. `ctest --test-dir build --output-on-failure` → 100% pass.
 3. If any `.cu`/`.cuh` changed (or `--full`): `compute-sanitizer --tool memcheck ./build/tests/unit_tests` → 0 errors.
-4. `clang-format --dry-run --Werror` on changed files.
+4. `clang-format --dry-run --Werror` on changed files (`--all-format`: every tracked source except `third_party/`).
 
 "Changed" = everything the branch touches vs its merge-base with `origin/main` — committed, staged, unstaged and untracked (`scripts/changed_files.sh`) — so a clean task branch is still fully checked.
 
