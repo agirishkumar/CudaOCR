@@ -33,7 +33,7 @@ lastFailure: (none)
 - M3.11, 2026-11-02, "pipeline: adaptive C 40 default, binarizePrep slot, new ratchets (M3.11)"
 
 ## AWAITING-MERGE
-(none)
+- PR #14 https://github.com/agirishkumar/CudaOCR/pull/14 (task/M3.7-M3.11-functional-ocr)
 
 ## BLOCKED
 (none)
