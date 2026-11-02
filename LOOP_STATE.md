@@ -16,7 +16,7 @@ lastFailure: (none)
 - W.1, 2026-11-02, "build: set CUDA arch default before project() (W.1)"
 
 ## AWAITING-MERGE
-(none)
+- PR #1 https://github.com/agirishkumar/CudaOCR/pull/1 (task/W.1-cuda-arch)
 
 ## BLOCKED
 (none)
