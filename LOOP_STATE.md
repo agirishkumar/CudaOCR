@@ -24,7 +24,7 @@ lastFailure: (none)
 - M3.2, 2026-11-02, "eval: CER/WER metrics and cudaocr-eval tool (M3.2)"
 
 ## AWAITING-MERGE
-(none)
+- PR #9 https://github.com/agirishkumar/CudaOCR/pull/9 (task/M3.2-cer-wer-eval)
 
 ## BLOCKED
 (none)
