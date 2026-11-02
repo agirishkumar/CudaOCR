@@ -1,6 +1,6 @@
 # LOOP_STATE — machine state for /engineer-step iterations
 
-Active milestone: MOD (next unchecked task: W.3 format the tree, then MOD.2 component interfaces), then M3
+Active milestone: MOD (next unchecked task: MOD.2 component interfaces), then M3
 
 CURRENT: (none)
 branch: (none)
@@ -15,10 +15,11 @@ lastFailure: (none)
 - docs, 2026-11-02, "docs: re-audit status, refine roadmap (W, MOD, M3–M6), branch-per-task workflow" (committed directly to main, pre-workflow)
 - W.1, 2026-11-02, "build: set CUDA arch default before project() (W.1)" — PR #1 merged
 - W.2, 2026-11-02, "verify: check everything the branch changes, not just the working tree (W.2)" — PR #2 merged
-- MOD.1, 2026-11-02, "types: add host-only page/line/word result types (MOD.1)"
+- MOD.1, 2026-11-02, "types: add host-only page/line/word result types (MOD.1)" — PR #3 merged
+- W.3, 2026-11-02, "style: clang-format the whole tree; add verify.sh --all-format (W.3)"
 
 ## AWAITING-MERGE
-- PR #3 https://github.com/agirishkumar/CudaOCR/pull/3 (task/MOD.1-result-types)
+(none)
 
 ## BLOCKED
 (none)

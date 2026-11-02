@@ -7,7 +7,9 @@
 
 namespace cudaocr::oracle {
 namespace {
-int clampi(int v, int lo, int hi) { return std::clamp(v, lo, hi); }
+int clampi(int v, int lo, int hi) {
+    return std::clamp(v, lo, hi);
+}
 }  // namespace
 
 HostImage grayscale(const HostImage& rgb) {
@@ -67,7 +69,8 @@ HostImage gaussian(const HostImage& in, int ksize, double sigma) {
         for (int x = 0; x < in.width; ++x) {
             std::uint32_t acc = 0;
             for (int d = -r; d <= r; ++d)
-                acc += static_cast<std::uint32_t>(w[d + r]) * in.at(clampi(x + d, 0, in.width - 1), y);
+                acc +=
+                    static_cast<std::uint32_t>(w[d + r]) * in.at(clampi(x + d, 0, in.width - 1), y);
             tmp.at(x, y) = static_cast<std::uint8_t>((acc + 32768u) >> 16);
         }
     HostImage out = HostImage::create(in.width, in.height, 1);
@@ -177,12 +180,11 @@ HostImage rotate(const HostImage& in, float angleDeg, std::uint8_t border) {
             const int y0 = static_cast<int>(std::floor(sy));
             if (x0 >= -1 && x0 < in.width && y0 >= -1 && y0 < in.height) {
                 const double fx = sx - x0, fy = sy - y0;
-                const double v = (1 - fx) * (1 - fy) * sample(x0, y0) +
-                                 fx * (1 - fy) * sample(x0 + 1, y0) +
-                                 (1 - fx) * fy * sample(x0, y0 + 1) +
-                                 fx * fy * sample(x0 + 1, y0 + 1);
-                result = static_cast<std::uint8_t>(
-                    std::min(255.0, std::max(0.0, std::nearbyint(v))));
+                const double v =
+                    (1 - fx) * (1 - fy) * sample(x0, y0) + fx * (1 - fy) * sample(x0 + 1, y0) +
+                    (1 - fx) * fy * sample(x0, y0 + 1) + fx * fy * sample(x0 + 1, y0 + 1);
+                result =
+                    static_cast<std::uint8_t>(std::min(255.0, std::max(0.0, std::nearbyint(v))));
             }
             out.at(x, y) = result;
         }

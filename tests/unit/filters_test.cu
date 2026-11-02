@@ -51,8 +51,8 @@ TEST(Median, MatchesOracle3and5) {
 TEST(Median, RemovesSaltAndPepper) {
     HostImage img = HostImage::create(64, 64, 1, 200);
     img.at(30, 30) = 0;  // lone pepper pixel
-    const HostImage got = runFilter(
-        img, [&](const DeviceImage& i, DeviceImage& o) { return medianFilter(i, o, 3); });
+    const HostImage got =
+        runFilter(img, [&](const DeviceImage& i, DeviceImage& o) { return medianFilter(i, o, 3); });
     EXPECT_EQ(got.at(30, 30), 200);
 }
 

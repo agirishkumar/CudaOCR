@@ -49,7 +49,8 @@ TEST(Otsu, MatchesOracleThreshold) {
     HostImage img = oracle::randomImage(200, 100, 1, /*seed=*/21);
     for (int y = 0; y < img.height; ++y)
         for (int x = 0; x < img.width; ++x)
-            img.at(x, y) = (x < img.width / 2) ? (40 + img.at(x, y) % 30) : (190 + img.at(x, y) % 30);
+            img.at(x, y) =
+                (x < img.width / 2) ? (40 + img.at(x, y) % 30) : (190 + img.at(x, y) % 30);
     auto dev = DeviceImage::fromHost(img);
     ASSERT_TRUE(dev.ok());
     auto t = otsuThreshold(dev.value());

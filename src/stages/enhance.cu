@@ -53,12 +53,11 @@ Status histogramEqualize(const DeviceImage& gray, DeviceImage& out, cudaStream_t
             lut[i] = static_cast<std::uint8_t>(std::lround(std::max(0.0, v)));
         }
     }
-    CUDAOCR_CHECK(cudaMemcpyToSymbolAsync(c_lut, lut, sizeof(lut), 0, cudaMemcpyHostToDevice,
-                                          stream));
+    CUDAOCR_CHECK(
+        cudaMemcpyToSymbolAsync(c_lut, lut, sizeof(lut), 0, cudaMemcpyHostToDevice, stream));
     const dim3 block(32, 8);
     lutKernel<<<gridFor(gray, block), block, 0, stream>>>(gray.data(), gray.pitch(), out.data(),
-                                                          out.pitch(), gray.width(),
-                                                          gray.height());
+                                                          out.pitch(), gray.width(), gray.height());
     CUDAOCR_CHECK_LAUNCH("lutKernel");
     return Status::Good();
 }
