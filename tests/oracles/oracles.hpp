@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "cudaocr/core/host_image.hpp"
+#include "cudaocr/stages/line_prep.cuh"
 
 namespace cudaocr::oracle {
 
@@ -23,6 +24,11 @@ HostImage invert(const HostImage& in);
 HostImage rotate(const HostImage& in, float angleDeg, std::uint8_t border);
 std::vector<int> rowProfile(const HostImage& bin);
 std::vector<int> colProfile(const HostImage& bin, int y0, int y1);
+
+// Line crop/resize/normalize reference (double precision) for prepareLines:
+// same geometry (crops from planLineCrops), returns the NCHW batch.
+std::vector<float> prepareLines(const HostImage& gray, const std::vector<LineCrop>& crops,
+                                const LinePrepParams& p, int batchWidth);
 
 // Deterministic pseudo-random image (LCG; no global RNG state).
 HostImage randomImage(int w, int h, int ch, std::uint32_t seed);

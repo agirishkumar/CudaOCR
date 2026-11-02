@@ -270,6 +270,8 @@ GPU determinism note: kernels that use `atomicAdd` on floats or reduction order 
 
 | 22 | 2026-11-02 | ORT pinned to 1.31.1 `gpu_cuda13` via FetchContent (URL + SHA-256 from the GitHub release digest), imported as `onnxruntime::onnxruntime`; `CUDAOCR_ORT_ROOT` to reuse an extracted tree; `CUDAOCR_WITH_ORT=OFF` builds the core without it | system install; vendoring binaries in git; Python `onnxruntime` | Reproducible and verifiable without sudo or a 233 MB blob in history; OFF keeps the GPU core buildable anywhere. Verified on driver 595.99 (CUDA 13.2) + toolkit 13.4 + cuDNN 9.27: CUDA EP runs with CPU fallback disabled. |
 
+| 23 | 2026-11-02 | Line crops: pad each detected box by 0.10 × its height on every side (off-page = white), bilinear to H=48 keeping aspect, coordinates in double inside the kernel | 0, 0.05, 0.15, 0.2, 0.3 padding; float coordinates | Sweep over the 6 synthetic pages (detected boxes → GPU crops → PP-OCRv5 on ORT-CPU → greedy CTC): CER 0.37 / 0.41 / **0.25** / 1.52 / 2.46 / 9.96 %; larger pads pull in neighbouring lines (54 % CER on the −4° page at 0.3). Float coordinates risk ~2e-4 error on 1200-px lines vs the 1e-4 oracle bound; double costs nothing measurable here (max diff vs oracle 3e-7). |
+
 *(Append new rows; never delete — supersede with a new row referencing the old.)*
 
 ## 12. Migration plan from current code (feeds BACKLOG.md M0)
