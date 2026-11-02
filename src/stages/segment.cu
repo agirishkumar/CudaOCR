@@ -3,6 +3,7 @@
 #include "cudaocr/stages/segment.cuh"
 
 #include <algorithm>
+#include <limits>
 
 namespace cudaocr {
 namespace {
@@ -68,17 +69,50 @@ Result<std::vector<int>> colProfile(const DeviceImage& bin, int y0, int y1, cuda
 
 std::vector<TextLine> detectLines(const std::vector<int>& rowCounts, int width, int minHeight) {
     const int thr = std::max(2, width / 200);
-    std::vector<TextLine> lines;
+    std::vector<TextLine> runs;
     int start = -1;
     const int h = static_cast<int>(rowCounts.size());
     for (int y = 0; y <= h; ++y) {
         const bool ink = (y < h) && rowCounts[y] >= thr;
         if (ink && start < 0) start = y;
         if (!ink && start >= 0) {
-            if (y - start >= minHeight) lines.push_back(TextLine{start, y - 1, {}});
+            runs.push_back(TextLine{start, y - 1, {}});
             start = -1;
         }
     }
+    auto height = [](const TextLine& l) { return l.y1 - l.y0 + 1; };
+
+    // Typical line height: median of the runs that would count as lines.
+    std::vector<int> heights;
+    for (const auto& r : runs)
+        if (height(r) >= minHeight) heights.push_back(height(r));
+    if (heights.empty()) return {};
+    std::nth_element(heights.begin(), heights.begin() + heights.size() / 2, heights.end());
+    const int typical = heights[heights.size() / 2];
+
+    // Slivers (< 1/3 of the typical height) within 1/3 line of a neighbour are
+    // descender bottoms or i/j dots split off by the ink threshold (measured:
+    // 5-6 px against 35-45 px lines, 5 px gap): merge them into the nearer
+    // neighbour (ties: the line above, the descender case). 1/3, not 1/2, so a
+    // genuine short line next to noise blobs is not swallowed.
+    constexpr int kFar = std::numeric_limits<int>::max();
+    std::vector<TextLine> lines;
+    for (size_t i = 0; i < runs.size(); ++i) {
+        const TextLine& r = runs[i];
+        if (3 * height(r) < typical) {
+            const int gapPrev = lines.empty() ? kFar : r.y0 - lines.back().y1 - 1;
+            const int gapNext = i + 1 < runs.size() ? runs[i + 1].y0 - r.y1 - 1 : kFar;
+            if (3 * std::min(gapPrev, gapNext) <= typical) {
+                if (gapPrev <= gapNext)
+                    lines.back().y1 = r.y1;
+                else
+                    runs[i + 1].y0 = r.y0;
+                continue;
+            }
+        }
+        lines.push_back(r);
+    }
+    std::erase_if(lines, [&](const TextLine& l) { return height(l) < minHeight; });
     return lines;
 }
 

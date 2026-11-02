@@ -14,7 +14,10 @@ Result<std::vector<int>> colProfile(const DeviceImage& bin, int y0, int y1,
                                     cudaStream_t stream = nullptr);
 
 // Host-side analysis of the profiles (deterministic, unit-testable without a GPU).
-// Rows with count >= max(2, width/200) are "ink"; runs shorter than minHeight are dropped.
+// Rows with count >= max(2, width/200) are "ink". Runs thinner than 1/3 of the
+// typical (median) line height that lie within 1/3 line of a neighbour are
+// merged into the nearer one (split-off descenders / i-dots); remaining runs
+// shorter than minHeight are dropped.
 std::vector<TextLine> detectLines(const std::vector<int>& rowCounts, int width, int minHeight = 3);
 
 // Fills line.words (and word.chars) from column profiles of the line band.

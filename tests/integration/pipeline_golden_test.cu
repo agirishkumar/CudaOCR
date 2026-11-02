@@ -4,6 +4,12 @@
 // equivalence test passed on every case — so this test keeps that equivalence
 // enforced now that the old code is gone. A change that alters detection on
 // purpose must regenerate these values and say why in the commit.
+//
+// Intentional changes since generation:
+// - M3.1 (rows marked "M3.1"): detectLines merges descender/i-dot slivers
+//   (< 1/3 typical line height, within 1/3 line) into the adjacent line. Each
+//   affected case lost exactly one 4-5 row band sitting 2 rows below a text
+//   line (verified visually on noisy_text.png: italic f/p/g descenders).
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -138,13 +144,13 @@ const Golden kGolden[] = {
     {"sample.png/otsu_nodeskew", 35, 353, 1436, 0.0000f, false, 0x74e571af487cef4bull},
     {"sample.png/equalize_median5", 35, 355, 525, 0.0000f, false, 0xb642d6f845233c3bull},
     {"sample.jpg/default", 3, 4, 15, 0.0000f, false, 0x85cf7b74c0addd6aull},
-    {"sample.jpg/otsu_nodeskew", 4, 11, 26, 0.0000f, false, 0xfb050de3155ef8c5ull},
+    {"sample.jpg/otsu_nodeskew", 3, 7, 22, 0.0000f, false, 0x470f6d6e82580eb7ull},  // M3.1
     {"sample.jpg/equalize_median5", 1, 1, 1, 0.0000f, false, 0xba5396c339cdb695ull},
     {"noisy_text.png/default", 3, 12, 20, 0.0000f, false, 0x4d232622824ae89aull},
-    {"noisy_text.png/otsu_nodeskew", 4, 22, 99, 0.0000f, false, 0x78872ab10999cf78ull},
+    {"noisy_text.png/otsu_nodeskew", 3, 16, 99, 0.0000f, false, 0xf257a9769275e1dcull},  // M3.1
     {"noisy_text.png/equalize_median5", 1, 1, 1, 0.0000f, false, 0x23834f81e5309b7dull},
     {"noisy_text2.png/default", 2, 2, 3, 0.0000f, false, 0x3a903881d09f40f4ull},
-    {"noisy_text2.png/otsu_nodeskew", 9, 46, 218, 0.0000f, false, 0xb3c89c2cb7cc63d5ull},
+    {"noisy_text2.png/otsu_nodeskew", 8, 44, 216, 0.0000f, false, 0xb0cfcf5a211cfa06ull},  // M3.1
     {"noisy_text2.png/equalize_median5", 1, 1, 1, 0.0000f, true, 0xc9c1e938e878a717ull},
     {"vigorous-before.png/default", 8, 13, 20, 0.7500f, false, 0x242e656882a58573ull},
     {"vigorous-before.png/otsu_nodeskew", 5, 7, 12, 0.0000f, false, 0x30124c3a28fde2a0ull},
