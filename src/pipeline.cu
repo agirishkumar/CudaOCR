@@ -7,6 +7,7 @@
 #include "cudaocr/stages/enhance.cuh"
 #include "cudaocr/stages/filters.cuh"
 #include "cudaocr/stages/grayscale.cuh"
+#include "cudaocr/stages/segment.cuh"
 
 #include <utility>
 
@@ -47,8 +48,7 @@ class StageTimer {
 
 Result<PipelineResult> runPipeline(const HostImage& input, const PipelineConfig& cfg,
                                    bool keepStages) {
-    if (input.empty())
-        return Status::Error(ErrorCode::InvalidArgument, "runPipeline: empty input");
+    if (input.empty()) return Status::Error(ErrorCode::InvalidArgument, "runPipeline: empty input");
 
     PipelineResult result;
     auto streamRes = Stream::create();
@@ -77,7 +77,8 @@ Result<PipelineResult> runPipeline(const HostImage& input, const PipelineConfig&
     if (cfg.equalize) {
         auto eq = DeviceImage::create(gray.width(), gray.height(), 1);
         if (!eq.ok()) return eq.status();
-        s = timer.timed("equalize", [&] { return histogramEqualize(gray, eq.value(), stream.get()); });
+        s = timer.timed("equalize",
+                        [&] { return histogramEqualize(gray, eq.value(), stream.get()); });
         if (!s.ok()) return s;
         gray = eq.take();
     }
@@ -86,7 +87,8 @@ Result<PipelineResult> runPipeline(const HostImage& input, const PipelineConfig&
     if (cfg.medianK > 0) {
         auto den = DeviceImage::create(gray.width(), gray.height(), 1);
         if (!den.ok()) return den.status();
-        s = timer.timed("median", [&] { return medianFilter(gray, den.value(), cfg.medianK, stream.get()); });
+        s = timer.timed("median",
+                        [&] { return medianFilter(gray, den.value(), cfg.medianK, stream.get()); });
         if (!s.ok()) return s;
         gray = den.take();
     }
@@ -125,8 +127,9 @@ Result<PipelineResult> runPipeline(const HostImage& input, const PipelineConfig&
             return applyThreshold(gray, bin, t.value(), stream.get());
         });
     } else {
-        s = timer.timed("adaptiveThreshold",
-                        [&] { return adaptiveThreshold(gray, bin, cfg.blockSize, cfg.C, stream.get()); });
+        s = timer.timed("adaptiveThreshold", [&] {
+            return adaptiveThreshold(gray, bin, cfg.blockSize, cfg.C, stream.get());
+        });
     }
     if (!s.ok()) return s;
 

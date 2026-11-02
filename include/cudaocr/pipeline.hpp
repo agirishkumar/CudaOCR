@@ -5,25 +5,21 @@
 
 #include "cudaocr/core/host_image.hpp"
 #include "cudaocr/core/status.hpp"
-#include "cudaocr/stages/segment.cuh"
+#include "cudaocr/stages/segment_types.hpp"
+#include "cudaocr/types.hpp"
 
 namespace cudaocr {
 
 struct PipelineConfig {
-    int medianK = 3;       // 0 disables denoising; otherwise 3 or 5
-    bool useOtsu = false;  // false = adaptive threshold
-    int blockSize = 31;    // adaptive threshold window (odd)
-    int C = 10;            // adaptive threshold offset
-    bool equalize = false; // histogram equalization before binarization
+    int medianK = 3;        // 0 disables denoising; otherwise 3 or 5
+    bool useOtsu = false;   // false = adaptive threshold
+    int blockSize = 31;     // adaptive threshold window (odd)
+    int C = 10;             // adaptive threshold offset
+    bool equalize = false;  // histogram equalization before binarization
     bool deskew = true;
     float maxSkewDeg = 15.0f;
     float skewStepDeg = 0.25f;
     int minLineHeight = 3;
-};
-
-struct StageTime {
-    std::string name;
-    float ms;
 };
 
 struct PipelineResult {
