@@ -1,8 +1,8 @@
 # LOOP_STATE — machine state for /engineer-step iterations
 
-Active milestone: M4 — batch M4.1–M4.4 on one branch (user request: single PR)
+Active milestone: M4 (M4.1–M4.4 shipped as one PR on user request; next: M4.5 CI)
 
-CURRENT: M4.4
+CURRENT: (none)
 branch: task/M4.1-M4.4-usable-product
 pr: (none)
 attempts: 0
@@ -34,6 +34,7 @@ lastFailure: (none)
 - M4.1, 2026-11-02, "output: JSON schema cudaocr.page/1 with recognized word boxes (M4.1)"
 - M4.2, 2026-11-02, "output: hOCR formatter (M4.2)"
 - M4.3, 2026-11-02, "config: TOML pipeline config, --config/--print-config (M4.3)"
+- M4.4, 2026-11-02, "cli: multi-page input with one pipeline per run (M4.4)"
 
 ## AWAITING-MERGE
 (none)

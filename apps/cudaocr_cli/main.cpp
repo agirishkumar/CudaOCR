@@ -1,10 +1,14 @@
 #include <algorithm>
+#include <cctype>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <set>
 #include <string>
+#include <vector>
 
 #include "cudaocr/config.hpp"
 #include "cudaocr/core/host_image.hpp"
@@ -17,8 +21,10 @@ using namespace cudaocr;
 
 void usage() {
     std::printf(
-        "usage: cudaocr <input-image> [options]\n"
-        "Prints the recognized text to stdout (diagnostics go to stderr).\n"
+        "usage: cudaocr <image|dir>... [options]\n"
+        "Prints the recognized text to stdout (diagnostics go to stderr). Several images or a\n"
+        "directory are processed with one pipeline: -o then names an output directory\n"
+        "(<stem>.<ext> per page); without -o, txt pages are separated by form feeds.\n"
         "  --config <file.toml>  pipeline config (docs/config.md); flags below override it\n"
         "  --print-config        print the effective config as TOML and exit\n"
         "  -o <file>             write output to a file (.json -> JSON, .hocr/.html -> hOCR,\n"
@@ -129,6 +135,66 @@ Status applyOverrides(PipelineConfig& cfg, const Overrides& o) {
     return Status::Good();
 }
 
+namespace fs = std::filesystem;
+
+bool isImageFile(const fs::path& p) {
+    std::string ext = p.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    for (const char* e : {".png", ".jpg", ".jpeg", ".bmp", ".tga", ".gif", ".pgm", ".ppm", ".pnm"})
+        if (ext == e) return true;
+    return false;
+}
+
+// Files as given; directories expand to their image files (non-recursive, sorted).
+std::vector<fs::path> expandInputs(const std::vector<std::string>& inputs, bool& sawDirectory) {
+    std::vector<fs::path> pages;
+    sawDirectory = false;
+    for (const auto& in : inputs) {
+        std::error_code ec;
+        if (fs::is_directory(in, ec)) {
+            sawDirectory = true;
+            std::vector<fs::path> files;
+            for (const auto& e : fs::directory_iterator(in, ec))
+                if (e.is_regular_file() && isImageFile(e.path())) files.push_back(e.path());
+            std::sort(files.begin(), files.end());
+            pages.insert(pages.end(), files.begin(), files.end());
+        } else {
+            pages.emplace_back(in);  // unreadable paths are reported when loaded
+        }
+    }
+    return pages;
+}
+
+void dumpStages(const std::string& dir, const StageImages& stages, const PageResult& r) {
+    fs::create_directories(dir);
+    auto save = [&](const std::string& name, const HostImage& im) {
+        if (im.empty()) return;
+        Status s = saveImage(dir + "/" + name, im);
+        if (!s.ok()) std::fprintf(stderr, "warn: %s\n", s.message.c_str());
+    };
+    save("01_gray.png", stages.gray);
+    save("02_binary.png", stages.binary);
+    save("03_deskewed.png", stages.deskewed);
+    save("05_deskewed_gray.png", stages.deskewedGray);
+    // Overlay: deskewed binary as RGB with line bands (blue), words (red), glyphs (green).
+    if (stages.deskewed.empty()) return;
+    const HostImage& base = stages.deskewed;
+    HostImage overlay = HostImage::create(base.width, base.height, 3);
+    for (int y = 0; y < overlay.height; ++y)
+        for (int x = 0; x < overlay.width; ++x)
+            for (int c = 0; c < 3; ++c) overlay.at(x, y, c) = base.at(x, y);
+    for (const auto& line : r.lines) {
+        drawRect(overlay, 0, line.box.y0, overlay.width - 1, line.box.y1, 80, 80, 255);
+        for (const auto& w : line.words) {
+            for (const auto& g : w.glyphs) drawRect(overlay, g.x0, g.y0, g.x1, g.y1, 0, 200, 0);
+            if (!w.box.empty())
+                drawRect(overlay, w.box.x0, w.box.y0, w.box.x1, w.box.y1, 255, 0, 0);
+        }
+    }
+    save("04_overlay.png", overlay);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -136,7 +202,8 @@ int main(int argc, char** argv) {
         usage();
         return 1;
     }
-    std::string input, outPath, format, dumpDir, configPath;
+    std::vector<std::string> inputs;
+    std::string outPath, format, dumpDir, configPath;
     bool verbose = false, printConfig = false;
     Overrides knobs;
     bool benchmark = false;
@@ -193,7 +260,7 @@ int main(int argc, char** argv) {
             usage();
             return 0;
         } else if (a[0] != '-') {
-            input = a;
+            inputs.push_back(a);
         } else {
             std::fprintf(stderr, "unknown option: %s\n", a.c_str());
             usage();
@@ -217,7 +284,7 @@ int main(int argc, char** argv) {
         std::fputs(toToml(cfg).c_str(), stdout);
         return 0;
     }
-    if (input.empty()) {
+    if (inputs.empty()) {
         usage();
         return 1;
     }
@@ -238,103 +305,146 @@ int main(int argc, char** argv) {
     // Only litter a log file when explicitly debugging; warnings/errors hit stderr anyway.
     if (level <= LogLevel::Debug) Logger::init("cudaocr.log");
     Logger::setLevel(level);
-    Logger::log(LogLevel::Info, "processing " + input);
 
-    auto img = loadImage(input);
-    if (!img.ok()) {
-        std::fprintf(stderr, "error: %s\n", img.status().message.c_str());
+    bool sawDirectory = false;
+    const std::vector<fs::path> pages = expandInputs(inputs, sawDirectory);
+    if (pages.empty()) {
+        std::fprintf(stderr, "error: no images found in the given directories\n");
         return 1;
     }
+    // Several pages (or any directory): -o names an output directory. A single
+    // page writes into a directory too when -o is an existing directory or ends in '/'.
+    const bool multi = pages.size() > 1 || sawDirectory;
+    std::error_code dirEc;
+    const bool outIsDir =
+        !outPath.empty() && (multi || fs::is_directory(outPath, dirEc) || outPath.back() == '/');
+    if (multi && outPath.empty() && format != "txt") {
+        std::fprintf(stderr, "error: --format %s with several pages needs -o <dir>\n",
+                     format.c_str());
+        return 1;
+    }
+    if (outIsDir) {
+        std::set<std::string> stems;
+        for (const auto& p : pages)
+            if (!stems.insert(p.stem().string()).second) {
+                std::fprintf(stderr, "error: two inputs named '%s'; outputs would collide in %s\n",
+                             p.stem().c_str(), outPath.c_str());
+                return 1;
+            }
+        std::error_code ec;
+        fs::create_directories(outPath, ec);
+        if (ec) {
+            std::fprintf(stderr, "error: cannot create %s: %s\n", outPath.c_str(),
+                         ec.message().c_str());
+            return 1;
+        }
+    }
 
+    // One pipeline (and one ORT session) for every page.
     auto pipeline = Pipeline::create(cfg);
     if (!pipeline.ok()) {
         std::fprintf(stderr, "config error: %s\n", pipeline.status().message.c_str());
         return 1;
     }
-    const bool keepStages = !dumpDir.empty();
-    StageImages stages;
-    auto res = pipeline.value().run(img.value(), keepStages ? &stages : nullptr);
-    if (!res.ok()) {
-        std::fprintf(stderr, "pipeline error: %s\n", res.status().message.c_str());
-        return 2;
-    }
-    const PageResult& r = res.value();
-
-    if (verbose) {
-        std::fprintf(stderr, "image:        %dx%d (%d channel%s)\n", img.value().width,
-                     img.value().height, img.value().channels, img.value().channels > 1 ? "s" : "");
-        std::fprintf(stderr, "skew angle:   %+.2f deg%s\n", r.skewDeg,
-                     cfg.deskewer ? " (corrected)" : "");
-        if (auto it = r.metrics.find("otsu.threshold"); it != r.metrics.end())
-            std::fprintf(stderr, "otsu thresh:  %d\n", static_cast<int>(it->second));
-        std::fprintf(stderr, "polarity:     %s\n",
-                     r.inverted ? "light-on-dark (inverted)" : "dark-on-light");
-        std::fprintf(stderr, "lines: %zu   words: %d   chars: %d\n", r.lines.size(), r.wordCount(),
-                     glyphCount(r));
-    }
-    if (benchmark) {
-        std::fprintf(stderr, "\n%-20s %10s\n", "stage", "ms");
-        float total = 0;
-        for (const auto& t : r.timings) {
-            std::fprintf(stderr, "%-20s %10.3f\n", t.name.c_str(), t.ms);
-            total += t.ms;
-        }
-        std::fprintf(stderr, "%-20s %10.3f\n", "TOTAL", total);
-    }
-
     auto fmt = ComponentRegistry::withBuiltins().make<Formatter>({format, {}});
-    auto formatted = fmt.ok() ? fmt.value()->format(r) : Result<std::string>(fmt.status());
-    if (!formatted.ok()) {
-        std::fprintf(stderr, "format error: %s\n", formatted.status().message.c_str());
-        return 2;
-    }
-    const std::string output = formatted.take();
-    if (outPath.empty()) {
-        std::fwrite(output.data(), 1, output.size(), stdout);
-    } else {
-        std::ofstream f(outPath, std::ios::binary);
-        f << output;
-        if (!f) {
-            std::fprintf(stderr, "error: cannot write %s\n", outPath.c_str());
-            return 2;
-        }
-        if (verbose) std::fprintf(stderr, "wrote %s\n", outPath.c_str());
+    if (!fmt.ok()) {
+        std::fprintf(stderr, "format error: %s\n", fmt.status().message.c_str());
+        return 1;
     }
 
-    if (keepStages) {
-        std::filesystem::create_directories(dumpDir);
-        auto save = [&](const std::string& name, const HostImage& im) {
-            if (im.empty()) return;
-            Status s = saveImage(dumpDir + "/" + name, im);
-            if (!s.ok()) std::fprintf(stderr, "warn: %s\n", s.message.c_str());
-        };
-        save("01_gray.png", stages.gray);
-        save("02_binary.png", stages.binary);
-        save("03_deskewed.png", stages.deskewed);
-        save("05_deskewed_gray.png", stages.deskewedGray);
-        // Overlay: deskewed binary as RGB with line bands (blue), words (red), chars (green).
-        if (!stages.deskewed.empty()) {
-            const HostImage& base = stages.deskewed;
-            HostImage overlay = HostImage::create(base.width, base.height, 3);
-            for (int y = 0; y < overlay.height; ++y)
-                for (int x = 0; x < overlay.width; ++x)
-                    for (int c = 0; c < 3; ++c) overlay.at(x, y, c) = base.at(x, y);
-            for (const auto& line : r.lines) {
-                drawRect(overlay, 0, line.box.y0, overlay.width - 1, line.box.y1, 80, 80, 255);
-                for (const auto& w : line.words) {
-                    for (const auto& g : w.glyphs)
-                        drawRect(overlay, g.x0, g.y0, g.x1, g.y1, 0, 200, 0);
-                    drawRect(overlay, w.box.x0, w.box.y0, w.box.x1, w.box.y1, 255, 0, 0);
-                }
+    int loadErrors = 0, runErrors = 0, noText = 0, done = 0;
+    const auto start = std::chrono::steady_clock::now();
+    for (const fs::path& page : pages) {
+        const std::string path = page.string();
+        Logger::log(LogLevel::Info, "processing " + path);
+        auto img = loadImage(path);
+        if (!img.ok()) {
+            std::fprintf(stderr, "error: %s\n", img.status().message.c_str());
+            ++loadErrors;
+            continue;
+        }
+        StageImages stages;
+        auto res = pipeline.value().run(img.value(), dumpDir.empty() ? nullptr : &stages);
+        if (!res.ok()) {
+            std::fprintf(stderr, "pipeline error: %s: %s\n", path.c_str(),
+                         res.status().message.c_str());
+            ++runErrors;
+            continue;
+        }
+        const PageResult& r = res.value();
+        ++done;
+
+        if (verbose) {
+            if (multi) std::fprintf(stderr, "== %s\n", path.c_str());
+            std::fprintf(stderr, "image:        %dx%d (%d channel%s)\n", img.value().width,
+                         img.value().height, img.value().channels,
+                         img.value().channels > 1 ? "s" : "");
+            std::fprintf(stderr, "skew angle:   %+.2f deg%s\n", r.skewDeg,
+                         cfg.deskewer ? " (corrected)" : "");
+            if (auto it = r.metrics.find("otsu.threshold"); it != r.metrics.end())
+                std::fprintf(stderr, "otsu thresh:  %d\n", static_cast<int>(it->second));
+            std::fprintf(stderr, "polarity:     %s\n",
+                         r.inverted ? "light-on-dark (inverted)" : "dark-on-light");
+            std::fprintf(stderr, "lines: %zu   words: %d   chars: %d\n", r.lines.size(),
+                         r.wordCount(), glyphCount(r));
+        }
+        if (benchmark) {
+            std::fprintf(stderr, "\n%-20s %10s\n", "stage", "ms");
+            float total = 0;
+            for (const auto& t : r.timings) {
+                std::fprintf(stderr, "%-20s %10.3f\n", t.name.c_str(), t.ms);
+                total += t.ms;
             }
-            save("04_overlay.png", overlay);
+            std::fprintf(stderr, "%-20s %10.3f\n", "TOTAL", total);
         }
-        if (verbose) std::fprintf(stderr, "stage dumps in %s/\n", dumpDir.c_str());
-    }
 
+        auto formatted = fmt.value()->format(r);
+        if (!formatted.ok()) {
+            std::fprintf(stderr, "format error: %s: %s\n", path.c_str(),
+                         formatted.status().message.c_str());
+            ++runErrors;
+            continue;
+        }
+        const std::string& output = formatted.value();
+        std::string target = outPath;
+        if (outIsDir)
+            target = (fs::path(outPath) /
+                      (page.stem().string() + "." + std::string(fmt.value()->extension())))
+                         .string();
+        if (target.empty()) {
+            if (multi && done > 1) std::fputs("\f", stdout);  // page separator (as Tesseract)
+            std::fwrite(output.data(), 1, output.size(), stdout);
+        } else {
+            std::ofstream f(target, std::ios::binary);
+            f << output;
+            if (!f) {
+                std::fprintf(stderr, "error: cannot write %s\n", target.c_str());
+                ++runErrors;
+                continue;
+            }
+            if (verbose) std::fprintf(stderr, "wrote %s\n", target.c_str());
+        }
+        if (!dumpDir.empty()) {
+            const std::string dir = multi ? dumpDir + "/" + page.stem().string() : dumpDir;
+            dumpStages(dir, stages, r);
+            if (verbose) std::fprintf(stderr, "stage dumps in %s/\n", dir.c_str());
+        }
+
+        // Nothing found: no text when recognizing, no lines when detecting only.
+        bool found = false;
+        for (const auto& l : r.lines) found = found || !cfg.recognizer || !l.text.empty();
+        if (!found) ++noText;
+    }
+    if (verbose && multi) {
+        const double ms =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start)
+                .count();
+        std::fprintf(stderr, "pages: %d done, %d unreadable, %d failed, %d without text; %.0f ms\n",
+                     done, loadErrors, runErrors, noText, ms);
+    }
     Logger::close();
-    // 3 = nothing found: no text when recognizing, no lines when detecting only.
-    bool found = false;
-    for (const auto& l : r.lines) found = found || !cfg.recognizer || !l.text.empty();
-    return found ? 0 : 3;
+    // Worst outcome wins: 2 runtime error, 1 unreadable input, 3 no text, 0 ok.
+    if (runErrors) return 2;
+    if (loadErrors) return 1;
+    return noText ? 3 : 0;
 }

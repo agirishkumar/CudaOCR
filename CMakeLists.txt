@@ -205,6 +205,10 @@ if(CUDAOCR_WITH_ORT)
   add_test(NAME Cli.TextOutput COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/cli_text_test.sh
                                        $<TARGET_FILE:cudaocr>)
   set_tests_properties(Cli.TextOutput PROPERTIES SKIP_RETURN_CODE 77)
+  add_test(NAME Cli.MultiPage
+           COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/cli_multipage_test.sh
+                   $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval>)
+  set_tests_properties(Cli.MultiPage PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 if(CUDAOCR_WITH_ORT)
   # Regression: exit-time heap corruption when a static Ort::Env was destroyed
