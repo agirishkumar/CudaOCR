@@ -31,6 +31,7 @@ add_library(cudaocr_lib STATIC
   src/stages/deskew.cu
   src/stages/segment.cu
   src/stages/segment_types.cpp
+  src/stages/line_prep.cu
   src/components/params.cpp
   src/components/preprocess.cpp
   src/components/hough_deskewer.cpp
@@ -111,6 +112,7 @@ add_executable(unit_tests
   tests/unit/deskew_test.cu
   tests/unit/segment_test.cu
   tests/unit/stage_adapters_test.cu
+  tests/unit/line_prep_test.cu
   tests/integration/pipeline_test.cu
   tests/integration/pipeline_golden_test.cu
   tests/integration/synth_fixtures_test.cu

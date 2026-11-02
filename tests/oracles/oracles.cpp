@@ -249,3 +249,42 @@ SyntheticPage makeSyntheticPage(int w, int h) {
 }
 
 }  // namespace cudaocr::oracle
+
+namespace cudaocr::oracle {
+
+std::vector<float> prepareLines(const HostImage& gray, const std::vector<LineCrop>& crops,
+                                const LinePrepParams& p, int batchWidth) {
+    const int H = p.height, C = p.channels;
+    const double white = (1.0 - p.mean) / p.scale;
+    std::vector<float> out(crops.size() * C * H * static_cast<size_t>(batchWidth));
+    auto px = [&](int x, int y) -> double {
+        if (x < 0 || y < 0 || x >= gray.width || y >= gray.height) return 255.0;
+        return gray.at(x, y);
+    };
+    for (size_t n = 0; n < crops.size(); ++n) {
+        const LineCrop& c = crops[n];
+        for (int y = 0; y < H; ++y)
+            for (int x = 0; x < batchWidth; ++x) {
+                double v = white;
+                if (x < c.outW) {
+                    // Pixel-center mapping, clamped to the crop (as in RecModel's reference).
+                    const double sy = std::clamp((y + 0.5) * c.h / H - 0.5, 0.0, c.h - 1.0);
+                    const double sx = std::clamp((x + 0.5) * c.w / c.outW - 0.5, 0.0, c.w - 1.0);
+                    const int y0 = static_cast<int>(sy), x0 = static_cast<int>(sx);
+                    const int y1 = std::min(y0 + 1, c.h - 1), x1 = std::min(x0 + 1, c.w - 1);
+                    const double fy = sy - y0, fx = sx - x0;
+                    const double s =
+                        (1 - fy) *
+                            ((1 - fx) * px(c.x0 + x0, c.y0 + y0) + fx * px(c.x0 + x1, c.y0 + y0)) +
+                        fy * ((1 - fx) * px(c.x0 + x0, c.y0 + y1) + fx * px(c.x0 + x1, c.y0 + y1));
+                    v = (s / 255.0 - p.mean) / p.scale;
+                }
+                for (int ch = 0; ch < C; ++ch)
+                    out[((n * C + ch) * H + y) * static_cast<size_t>(batchWidth) + x] =
+                        static_cast<float>(v);
+            }
+    }
+    return out;
+}
+
+}  // namespace cudaocr::oracle
