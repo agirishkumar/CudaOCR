@@ -44,7 +44,7 @@ Priorities, in order:
 
 ### 4.2 Not done
 
-- **Recognition — the core of OCR.** The pipeline finds lines and words but cannot read them. No text is produced yet.
+- ~~Recognition~~ — done in M3.7–M3.9 (`onnx` recognizer + `ctc-greedy` decoder + `txt` formatter; CLI prints text).
 - Text output formats (txt/hOCR), config file, accuracy measurement (no ground-truth harness, no CER/WER numbers).
 - Performance follow-ups: median is 27× slower than NPP (M1.9 → M6), Gaussian 2.75× (M1.10 → M6).
 - GPU connected-component labeling (M2.5 → M6; not needed for line-level recognition, see §5 Stage 4).

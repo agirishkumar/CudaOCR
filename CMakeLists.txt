@@ -39,6 +39,7 @@ add_library(cudaocr_lib STATIC
   src/components/builtin.cpp
   src/components/ctc_greedy_decoder.cpp
   src/components/charset.cpp
+  src/components/txt_formatter.cpp
   src/eval/metrics.cpp
   src/pipeline.cu
 )
@@ -114,6 +115,7 @@ add_executable(unit_tests
   tests/unit/registry_test.cpp
   tests/unit/eval_test.cpp
   tests/unit/ctc_decoder_test.cpp
+  tests/unit/txt_formatter_test.cpp
   tests/unit/components_test.cpp
   tests/unit/device_test.cu
   tests/unit/stream_ordering_test.cu
@@ -133,7 +135,8 @@ add_executable(unit_tests
 target_link_libraries(unit_tests PRIVATE cudaocr_lib gtest gtest_main)
 if(CUDAOCR_WITH_ORT)
   target_sources(unit_tests PRIVATE tests/unit/ort_smoke_test.cpp tests/unit/rec_model_test.cpp
-                 tests/unit/onnx_recognizer_test.cpp)
+                 tests/unit/onnx_recognizer_test.cpp
+                 tests/integration/ocr_end_to_end_test.cpp)
   target_link_libraries(unit_tests PRIVATE onnxruntime::onnxruntime)
 endif()
 target_include_directories(unit_tests PRIVATE tests)
@@ -151,15 +154,16 @@ gtest_discover_tests(unit_tests DISCOVERY_TIMEOUT 60)
 
 # CLI smoke tests: pin the end-to-end counts on the real sample scan
 # (same numbers as PipelineGolden, through argument parsing and printing).
-add_test(NAME Cli.SampleDefault COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png)
+add_test(NAME Cli.SampleDefault COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png -v --no-recognize)
 set_tests_properties(Cli.SampleDefault PROPERTIES
   PASS_REGULAR_EXPRESSION "lines: 35   words: 348   chars: 903")
 add_test(NAME Cli.SampleOtsuNoDeskew
-         COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png --otsu --no-deskew)
+         COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png --otsu --no-deskew -v
+                 --no-recognize)
 set_tests_properties(Cli.SampleOtsuNoDeskew PROPERTIES
   PASS_REGULAR_EXPRESSION "otsu thresh: +[0-9]+.*lines: 35   words: 353   chars: 1436")
 add_test(NAME Cli.BadParamIsConfigError
-         COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png --C abc)
+         COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png --C abc --no-recognize)
 set_tests_properties(Cli.BadParamIsConfigError PROPERTIES WILL_FAIL TRUE)
 
 # cudaocr-eval on a tiny fixture: exact (0/11 chars, 0/2 words), one-char typo
@@ -176,6 +180,15 @@ set_tests_properties(Eval.ToolMaxCerFails PROPERTIES WILL_FAIL TRUE)
 add_test(NAME Eval.ToolMaxCerPasses
          COMMAND cudaocr-eval ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/eval/pred
                  ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/eval/gt --max-cer 0.20)
+
+if(CUDAOCR_WITH_ORT)
+  add_test(NAME Cli.TextOutput COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/cli_text_test.sh
+                                       $<TARGET_FILE:cudaocr>)
+  set_tests_properties(Cli.TextOutput PROPERTIES SKIP_RETURN_CODE 77)
+endif()
+add_test(NAME Cli.BlankPageDetectOnlyExits3
+         COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/blank.png --no-recognize)
+set_tests_properties(Cli.BlankPageDetectOnlyExits3 PROPERTIES WILL_FAIL TRUE)
 
 # Tooling tests (verify gate helpers).
 add_test(NAME Scripts.GenFixtures

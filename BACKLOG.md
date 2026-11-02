@@ -80,7 +80,7 @@ Active milestone: **M3** (MOD complete)
   *Accept:* unit tests on hand-built logits (repeats, blanks between repeats, all-blank → empty, unknown index → error).
 - [x] **M3.8 OnnxLineRecognizer.** Implements `LineRecognizer`; batches lines (configurable max batch/width), EP from params (`cuda`|`cpu`), session created once per Pipeline. Note (M3.4): create the `Ort::Env` before any `CreateCUDAProviderOptions` call. Note (M3.6): in a padded batch, decode only line n's first ⌊crops[n].outW / 8⌋ timesteps.
   *Accept:* on a rendered single-line fixture ("The quick brown fox jumps over the lazy dog") greedy-decoded text matches exactly on both EPs; CPU and CUDA logits agree within 1e-3.
-- [ ] **M3.9 End-to-end text + txt formatter.** Wire recognizer+decoder into `Pipeline`; `TxtFormatter`; CLI prints text to stdout or `-o file.txt`; exit code 3 when no text.
+- [x] **M3.9 End-to-end text + txt formatter.** Wire recognizer+decoder into `Pipeline`; `TxtFormatter`; CLI prints text to stdout or `-o file.txt`; exit code 3 when no text.
   *Accept:* integration test — CER ≤ 5% on committed clean synthetic pages; `cudaocr resources/sample.png` exits 0 with non-empty output.
 - [ ] **M3.10 Accuracy baseline report.** Run eval on all synthetic variants + 1–2 hand-transcribed `resources/` pages; write `benchmarks/ACCURACY.md`; add a ratchet test that fails if clean-synthetic CER regresses by > 1 point.
   *Accept:* report committed; ratchet test green.
@@ -115,3 +115,4 @@ Expand into per-op tasks after M3.5 documents the model's op list. Expected shap
 - [ ] **M6.4 GPU connected-component labeling** (was M2.5): union-find; char boxes for debug overlay. *Accept:* component count == CPU oracle.
 - [ ] **M6.5 CTC beam search + optional wordlist.**
 - [ ] **M6.6 Multi-stream batch throughput** for M4.4.
+- [ ] **M6.7 Recognizer throughput.** Measured in M3.9 on `resources/sample.png` (35 lines, ~1290 px wide after upscaling small text to H=48): ORT CUDA EP **~267 ms/page warm** (first run ~660 ms: cuDNN/cuBLAS init), CPU EP ~2.3 s; maxBatch 8–16 is the sweet spot (1: 604 ms, 64: 302 ms); TF32 ≈ 3 %; cuDNN algo search HEURISTIC no change, DEFAULT slower. Target ≤ 150 ms/page. Profile with Nsight Systems first; candidates: IoBinding with preallocated outputs, CUDA graphs, FP16 model, TensorRT EP, downscale cap for very small text. *Accept:* ≤ 150 ms warm on sample.png with CER unchanged.

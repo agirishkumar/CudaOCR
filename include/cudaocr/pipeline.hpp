@@ -16,13 +16,16 @@ namespace cudaocr {
 
 // Defaults reproduce the original hard-wired pipeline: median 3x3, polarity
 // normalization, adaptive threshold (31, 10), Hough deskew (±15°, 0.25° step),
-// projection-profile detection (min line height 3).
+// projection-profile detection (min line height 3). Recognition is opt-in
+// (`recognizer`, e.g. {"onnx", ...}): without it lines carry geometry only.
 struct PipelineConfig {
     ComponentSpec toGray{"grayscale", {}};  // runs only for 3-channel input
     std::vector<ComponentSpec> preprocess{{"median", Params().set("k", 3)}, {"polarity", {}}};
     ComponentSpec binarizer{"adaptive", {}};
     std::optional<ComponentSpec> deskewer = ComponentSpec{"hough", {}};  // nullopt = skip
     ComponentSpec detector{"projection", {}};
+    std::optional<ComponentSpec> recognizer;  // nullopt = detection only
+    ComponentSpec decoder{"ctc-greedy", {}};  // used only with a recognizer
 };
 
 // Intermediate images for --dump-stages / debugging.

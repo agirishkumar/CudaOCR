@@ -62,6 +62,8 @@ struct Pipeline::Impl {
     std::unique_ptr<ImageStage> binarizer;
     std::unique_ptr<Deskewer> deskewer;  // null = skip
     std::unique_ptr<TextDetector> detector;
+    std::unique_ptr<LineRecognizer> recognizer;  // null = detection only
+    std::unique_ptr<Decoder> decoder;
     // Device buffers reused across runs (DeviceImage::ensure).
     DeviceImage input, a, b, bin, straight, grayStraight;
 };
@@ -86,6 +88,10 @@ Result<Pipeline> Pipeline::create(const PipelineConfig& cfg, const ComponentRegi
     if (s.ok()) s = resolve(registry, cfg.binarizer, "binarizer", impl->binarizer);
     if (s.ok() && cfg.deskewer) s = resolve(registry, *cfg.deskewer, "deskewer", impl->deskewer);
     if (s.ok()) s = resolve(registry, cfg.detector, "detector", impl->detector);
+    if (s.ok() && cfg.recognizer) {
+        s = resolve(registry, *cfg.recognizer, "recognizer", impl->recognizer);
+        if (s.ok()) s = resolve(registry, cfg.decoder, "decoder", impl->decoder);
+    }
     if (!s.ok()) return s;
     return Pipeline(std::move(impl));
 }
@@ -162,6 +168,29 @@ Result<PageResult> Pipeline::run(const HostImage& input, StageImages* keep) {
         return Status::Good();
     });
     if (!s.ok()) return s;
+
+    // Recognition reads the deskewed gray page, which shares the binary page's
+    // geometry, so the detector's boxes are valid crops.
+    if (m.recognizer && !page.lines.empty()) {
+        std::vector<CtcProbs> probs;
+        s = timer.timed(page, m.recognizer->name(), [&]() -> Status {
+            auto r = m.recognizer->recognize(*gray, page.lines, ctx);
+            if (!r.ok()) return r.status();
+            probs = r.take();
+            return Status::Good();
+        });
+        if (!s.ok()) return s;
+        s = timer.timed(page, m.decoder->name(), [&]() -> Status {
+            for (size_t i = 0; i < page.lines.size(); ++i) {
+                auto d = m.decoder->decode(probs[i], m.recognizer->charset());
+                if (!d.ok()) return d.status();
+                page.lines[i].text = std::move(d.value().text);
+                page.lines[i].conf = d.value().conf;
+            }
+            return Status::Good();
+        });
+        if (!s.ok()) return s;
+    }
 
     s = m.stream.synchronize();
     if (!s.ok()) return s;

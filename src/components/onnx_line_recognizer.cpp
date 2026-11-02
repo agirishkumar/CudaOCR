@@ -16,7 +16,8 @@ namespace {
 // One Env per process. It must exist before any provider-options call
 // (CreateCUDAProviderOptions needs ORT's default logger; found in M3.4).
 Ort::Env& ortEnv() {
-    static Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "cudaocr");
+    static Ort::Env env(ORT_LOGGING_LEVEL_ERROR,
+                        "cudaocr");  // WARNING floods stderr with node-placement notes
     return env;
 }
 
