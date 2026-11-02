@@ -164,6 +164,22 @@ struct Formatter { virtual std::string_view extension() const = 0;
 }
 ```
 
+**Built-in components (MOD.3)** — each has `static Result<std::unique_ptr<T>> create(const Params&)`; unknown keys and out-of-range values are rejected at creation:
+
+| Name | Interface | Class | Params (default) |
+|---|---|---|---|
+| `grayscale` | ImageStage | `GrayscaleStage` | — (1-channel input is copied through) |
+| `equalize` | ImageStage | `EqualizeStage` | — |
+| `median` | ImageStage | `MedianStage` | `k` ∈ {3, 5} (3) |
+| `gaussian` | ImageStage | `GaussianStage` | `ksize` odd ≥ 3 (5), `sigma` ≥ 0, 0 = from ksize (0) |
+| `polarity` | ImageStage | `PolarityStage` | — (sets `page->inverted`) |
+| `adaptive` | ImageStage | `AdaptiveBinarizer` | `blockSize` odd ≥ 3 (31), `C` (10) |
+| `otsu` | ImageStage | `OtsuBinarizer` | — (`lastThreshold()`) |
+| `hough` | Deskewer | `HoughDeskewer` | `maxAngle` (0, 45] (15), `step` (0, maxAngle] (0.25); \|angle\| < step/2 → copy |
+| `projection` | TextDetector | `ProjectionDetector` | `minLineHeight` ≥ 1 (3) |
+
+Core support: `DeviceImage::ensure(w, h, ch)` reuses a matching allocation; `DeviceImage::copyTo(dst, stream)` for pass-through stages.
+
 Rules: components never call each other directly — only `Pipeline` composes them; data crosses component boundaries only as the types above; library headers (ORT) are included only in the `.cpp` of the component that uses them.
 
 - Everything lives in `namespace cudaocr` (currently there is no namespace — fix during migration).

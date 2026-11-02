@@ -32,6 +32,9 @@ add_library(cudaocr_lib STATIC
   src/stages/segment.cu
   src/stages/segment_types.cpp
   src/components/params.cpp
+  src/components/preprocess.cpp
+  src/components/hough_deskewer.cpp
+  src/components/projection_detector.cpp
   src/pipeline.cu
 )
 target_include_directories(cudaocr_lib PUBLIC include)
@@ -71,6 +74,7 @@ add_executable(unit_tests
   tests/unit/enhance_test.cu
   tests/unit/deskew_test.cu
   tests/unit/segment_test.cu
+  tests/unit/stage_adapters_test.cu
   tests/integration/pipeline_test.cu
 )
 target_link_libraries(unit_tests PRIVATE cudaocr_lib gtest gtest_main)

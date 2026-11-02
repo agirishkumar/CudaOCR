@@ -1,6 +1,6 @@
 # LOOP_STATE — machine state for /engineer-step iterations
 
-Active milestone: MOD (next unchecked task: MOD.3 wrap existing stages), then M3
+Active milestone: MOD (next unchecked task: MOD.4 registry + config-built Pipeline), then M3
 
 CURRENT: (none)
 branch: (none)
@@ -17,10 +17,11 @@ lastFailure: (none)
 - W.2, 2026-11-02, "verify: check everything the branch changes, not just the working tree (W.2)" — PR #2 merged
 - MOD.1, 2026-11-02, "types: add host-only page/line/word result types (MOD.1)" — PR #3 merged
 - W.3, 2026-11-02, "style: clang-format the whole tree; add verify.sh --all-format (W.3)" — PR #4 merged
-- MOD.2, 2026-11-02, "components: add stage interfaces and Params (MOD.2)"
+- MOD.2, 2026-11-02, "components: add stage interfaces and Params (MOD.2)" — PR #5 merged
+- MOD.3, 2026-11-02, "components: wrap existing kernels as built-in components (MOD.3)"
 
 ## AWAITING-MERGE
-- PR #5 https://github.com/agirishkumar/CudaOCR/pull/5 (task/MOD.2-component-interfaces)
+- PR #6 https://github.com/agirishkumar/CudaOCR/pull/6 (task/MOD.3-wrap-stages)
 
 ## BLOCKED
 (none)

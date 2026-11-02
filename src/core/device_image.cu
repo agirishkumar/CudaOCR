@@ -50,6 +50,26 @@ Result<DeviceImage> DeviceImage::create(int width, int height, int channels) {
     return img;
 }
 
+Status DeviceImage::ensure(int width, int height, int channels) {
+    if (data_ && width == width_ && height == height_ && channels == channels_)
+        return Status::Good();
+    auto img = create(width, height, channels);
+    if (!img.ok()) return img.status();
+    *this = img.take();
+    return Status::Good();
+}
+
+Status DeviceImage::copyTo(DeviceImage& dst, cudaStream_t stream) const {
+    if (&dst == this)
+        return Status::Error(ErrorCode::InvalidArgument, "DeviceImage::copyTo: dst is src");
+    Status s = dst.ensure(width_, height_, channels_);
+    if (!s.ok()) return s;
+    CUDAOCR_CHECK(cudaMemcpy2DAsync(dst.data_, dst.pitch_, data_, pitch_,
+                                    static_cast<size_t>(width_) * channels_, height_,
+                                    cudaMemcpyDeviceToDevice, stream));
+    return Status::Good();
+}
+
 Result<DeviceImage> DeviceImage::fromHost(const HostImage& host) {
     auto img = create(host.width, host.height, host.channels);
     if (!img.ok()) return img.status();
