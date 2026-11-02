@@ -17,7 +17,7 @@ lastFailure: (none)
 - W.2, 2026-11-02, "verify: check everything the branch changes, not just the working tree (W.2)"
 
 ## AWAITING-MERGE
-(none)
+- PR #2 https://github.com/agirishkumar/CudaOCR/pull/2 (task/W.2-branch-aware-verify)
 
 ## BLOCKED
 (none)
