@@ -23,7 +23,7 @@ lastFailure: (none)
 - M3.1, 2026-11-02, "fixtures: synthetic ground-truth generator; merge descender slivers (M3.1)"
 
 ## AWAITING-MERGE
-(none)
+- PR #8 https://github.com/agirishkumar/CudaOCR/pull/8 (task/M3.1-synthetic-fixtures)
 
 ## BLOCKED
 (none)
