@@ -6,7 +6,7 @@ Rules
 - Acceptance criteria must be machine-checkable. Add/split tasks freely; never reorder or delete a checked task.
 - Unchecked tasks may be moved between milestones; leave a "→ moved to" note.
 
-Active milestone: **W** (W.2 next) → then **MOD** → **M3**
+Active milestone: **MOD** (W complete) → then **M3**
 
 ## M0 — Re-foundation ✅ (2026-06-11)
 
@@ -44,7 +44,7 @@ Active milestone: **W** (W.2 next) → then **MOD** → **M3**
 
 - [x] **W.1 CUDA arch default regression.** Set the `CMAKE_CUDA_ARCHITECTURES` default *before* `project()` (cache-overridable). Add regression test `CudaArchMatchesDevice` asserting a library kernel's `cudaFuncAttributes.binaryVersion` equals the device's compute capability (i.e. native SASS present, no PTX JIT).
   *Accept:* on a fresh `cmake -B build` (no `-D` flags) `ctest` → 100% pass on CUDA 13.4 + driver 13.2; `cuobjdump --list-elf build/libcudaocr_lib.a` shows `sm_86`; new test fails if arch is forced to 75.
-- [ ] **W.2 Branch-aware verify gate.** `verify.sh` computes changed files as `git diff --name-only $(git merge-base HEAD origin/main)` ∪ working tree, so memcheck/format run on everything the PR touches; add a `--full` flag (memcheck all tests regardless).
+- [x] **W.2 Branch-aware verify gate.** `verify.sh` computes changed files as `git diff --name-only $(git merge-base HEAD origin/main)` ∪ working tree, so memcheck/format run on everything the PR touches; add a `--full` flag (memcheck all tests regardless).
   *Accept:* on a branch with a committed `.cu` change and clean tree, `verify.sh` runs memcheck and format on that file; on `main` with clean tree it skips them.
 
 ## MOD — Modular core (no behavior change; makes every later task a drop-in)
