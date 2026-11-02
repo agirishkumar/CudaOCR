@@ -1,3 +1,4 @@
+#include "cudaocr/components/ctc_greedy_decoder.hpp"
 #include "cudaocr/components/hough_deskewer.hpp"
 #include "cudaocr/components/preprocess.hpp"
 #include "cudaocr/components/projection_detector.hpp"
@@ -30,6 +31,7 @@ ComponentRegistry ComponentRegistry::withBuiltins() {
     (void)r.add<ImageStage>("otsu", factoryOf<OtsuBinarizer, ImageStage>());
     (void)r.add<Deskewer>("hough", factoryOf<HoughDeskewer, Deskewer>());
     (void)r.add<TextDetector>("projection", factoryOf<ProjectionDetector, TextDetector>());
+    (void)r.add<Decoder>("ctc-greedy", factoryOf<CtcGreedyDecoder, Decoder>());
     return r;
 }
 

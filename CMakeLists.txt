@@ -37,6 +37,7 @@ add_library(cudaocr_lib STATIC
   src/components/hough_deskewer.cpp
   src/components/projection_detector.cpp
   src/components/builtin.cpp
+  src/components/ctc_greedy_decoder.cpp
   src/eval/metrics.cpp
   src/pipeline.cu
 )
@@ -102,6 +103,7 @@ add_executable(unit_tests
   tests/unit/params_test.cpp
   tests/unit/registry_test.cpp
   tests/unit/eval_test.cpp
+  tests/unit/ctc_decoder_test.cpp
   tests/unit/components_test.cpp
   tests/unit/device_test.cu
   tests/unit/stream_ordering_test.cu
