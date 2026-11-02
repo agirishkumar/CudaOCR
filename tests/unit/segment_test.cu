@@ -56,8 +56,7 @@ TEST(SegmentLine, FindsWordsAndChars) {
     for (int li = 0; li < page.lineCount; ++li) {
         Status s = segmentLine(dev.value(), lines[li]);
         ASSERT_TRUE(s.ok()) << s.message;
-        EXPECT_EQ(static_cast<int>(lines[li].words.size()), page.wordsPerLine[li])
-            << "line " << li;
+        EXPECT_EQ(static_cast<int>(lines[li].words.size()), page.wordsPerLine[li]) << "line " << li;
         int chars = 0;
         for (const auto& w : lines[li].words) chars += static_cast<int>(w.chars.size());
         EXPECT_EQ(chars, page.charsPerLine[li]) << "line " << li;

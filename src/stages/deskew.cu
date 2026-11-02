@@ -24,7 +24,7 @@ __global__ void houghKernel(const std::uint8_t* __restrict__ img, size_t pitch, 
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= w || y >= h) return;
-    if (img[static_cast<size_t>(y) * pitch + x] >= 128) return;  // background
+    if (img[static_cast<size_t>(y) * pitch + x] >= 128) return;                  // background
     if (y + 1 < h && img[static_cast<size_t>(y + 1) * pitch + x] < 128) return;  // not a baseline
     for (int t = 0; t < numTheta; ++t) {
         const int r = __float2int_rn(x * c_cosTheta[t] + y * c_sinTheta[t]) + rhoOffset;
@@ -87,9 +87,9 @@ Result<float> detectSkewAngle(const DeviceImage& bin, float maxAngleDeg, float s
     CUDAOCR_CHECK_R(cudaMemcpyToSymbolAsync(c_sinTheta, sinT.data(), numTheta * sizeof(float), 0,
                                             cudaMemcpyHostToDevice, stream));
 
-    const int diag = static_cast<int>(
-        std::ceil(std::sqrt(static_cast<double>(bin.width()) * bin.width() +
-                            static_cast<double>(bin.height()) * bin.height())));
+    const int diag =
+        static_cast<int>(std::ceil(std::sqrt(static_cast<double>(bin.width()) * bin.width() +
+                                             static_cast<double>(bin.height()) * bin.height())));
     const int rhoBins = 2 * diag + 1;
     const int rhoOffset = diag;
 
@@ -99,8 +99,7 @@ Result<float> detectSkewAngle(const DeviceImage& bin, float maxAngleDeg, float s
     if (!s.ok()) return s;
 
     const dim3 block(32, 8);
-    const dim3 grid((bin.width() + block.x - 1) / block.x,
-                    (bin.height() + block.y - 1) / block.y);
+    const dim3 grid((bin.width() + block.x - 1) / block.x, (bin.height() + block.y - 1) / block.y);
     houghKernel<<<grid, block, 0, stream>>>(bin.data(), bin.pitch(), bin.width(), bin.height(),
                                             acc.value().data(), rhoBins, rhoOffset, numTheta);
     CUDAOCR_CHECK_R(cudaGetLastError());
@@ -125,10 +124,9 @@ Status rotate(const DeviceImage& in, DeviceImage& out, float angleDeg, std::uint
     const double a = angleDeg * M_PI / 180.0;
     const dim3 block(32, 8);
     const dim3 grid((in.width() + block.x - 1) / block.x, (in.height() + block.y - 1) / block.y);
-    rotateKernel<<<grid, block, 0, stream>>>(in.data(), in.pitch(), in.width(), in.height(),
-                                             out.data(), out.pitch(), std::cos(a), std::sin(a),
-                                             (in.width() - 1) / 2.0, (in.height() - 1) / 2.0,
-                                             border);
+    rotateKernel<<<grid, block, 0, stream>>>(
+        in.data(), in.pitch(), in.width(), in.height(), out.data(), out.pitch(), std::cos(a),
+        std::sin(a), (in.width() - 1) / 2.0, (in.height() - 1) / 2.0, border);
     CUDAOCR_CHECK_LAUNCH("rotateKernel");
     return Status::Good();
 }

@@ -106,11 +106,11 @@ int main() {
         const NppiSize inner{W - 8, H - 8};
         const float c = timeMs(nullptr, [&] { (void)medianFilter(gray, out1.value(), 5); });
         const float n = timeMs(nullptr, [&] {
-            nppiFilterMedian_8u_C1R_Ctx(
-                gray.data() + 4 * gray.pitch() + 4, static_cast<int>(gray.pitch()),
-                out2.value().data() + 4 * out2.value().pitch() + 4,
-                static_cast<int>(out2.value().pitch()), inner, {5, 5}, {2, 2},
-                scratch.value().data(), ctx);
+            nppiFilterMedian_8u_C1R_Ctx(gray.data() + 4 * gray.pitch() + 4,
+                                        static_cast<int>(gray.pitch()),
+                                        out2.value().data() + 4 * out2.value().pitch() + 4,
+                                        static_cast<int>(out2.value().pitch()), inner, {5, 5},
+                                        {2, 2}, scratch.value().data(), ctx);
         });
         report("median 5x5", c, n);
     }
@@ -118,11 +118,10 @@ int main() {
         const float c = timeMs(nullptr, [&] { (void)boxMean(gray, out1.value(), 31); });
         const NppiSize inner{W - 32, H - 32};
         const float n = timeMs(nullptr, [&] {
-            nppiFilterBox_8u_C1R_Ctx(gray.data() + 16 * gray.pitch() + 16,
-                                     static_cast<int>(gray.pitch()),
-                                     out2.value().data() + 16 * out2.value().pitch() + 16,
-                                     static_cast<int>(out2.value().pitch()), inner, {31, 31},
-                                     {15, 15}, ctx);
+            nppiFilterBox_8u_C1R_Ctx(
+                gray.data() + 16 * gray.pitch() + 16, static_cast<int>(gray.pitch()),
+                out2.value().data() + 16 * out2.value().pitch() + 16,
+                static_cast<int>(out2.value().pitch()), inner, {31, 31}, {15, 15}, ctx);
         });
         report("box mean 31x31", c, n);
     }

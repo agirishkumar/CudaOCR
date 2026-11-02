@@ -41,8 +41,7 @@ Result<DeviceImage> DeviceImage::create(int width, int height, int channels) {
     DeviceImage img;
     void* ptr = nullptr;
     size_t pitch = 0;
-    CUDAOCR_CHECK_R(
-        cudaMallocPitch(&ptr, &pitch, static_cast<size_t>(width) * channels, height));
+    CUDAOCR_CHECK_R(cudaMallocPitch(&ptr, &pitch, static_cast<size_t>(width) * channels, height));
     img.data_ = static_cast<std::uint8_t*>(ptr);
     img.pitch_ = pitch;
     img.width_ = width;

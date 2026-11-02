@@ -33,8 +33,7 @@ Status saveImage(const std::string& path, const HostImage& img) {
     if (img.empty()) return Status::Error(ErrorCode::InvalidArgument, "saveImage: empty image");
     auto endsWith = [&](const char* suf) {
         const size_t n = std::strlen(suf);
-        return path.size() >= n &&
-               std::equal(path.end() - n, path.end(), suf, [](char a, char b) {
+        return path.size() >= n && std::equal(path.end() - n, path.end(), suf, [](char a, char b) {
                    return std::tolower(a) == std::tolower(b);
                });
     };
