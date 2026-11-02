@@ -22,7 +22,7 @@ lastFailure: (none)
 - MOD.4, 2026-11-02, "pipeline: registry + config-built Pipeline; fix stream race; pin legacy output (MOD.4)"
 
 ## AWAITING-MERGE
-(none)
+- PR #7 https://github.com/agirishkumar/CudaOCR/pull/7 (task/MOD.4-registry-pipeline)
 
 ## BLOCKED
 (none)
