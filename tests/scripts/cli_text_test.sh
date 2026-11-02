@@ -37,6 +37,23 @@ for w in line["words"]:
     assert line["bbox"][0] <= x0 <= x1 <= line["bbox"][2], w
 PY
 
+"$CLI" "$ROOT/tests/fixtures/synth/page_sans_clean.png" -o "$TMP/page.hocr" 2>/dev/null
+"$CLI" "$ROOT/tests/fixtures/synth/page_sans_clean.png" -o "$TMP/page.json" 2>/dev/null
+python3 - "$TMP/page.hocr" "$TMP/page.json" <<'PY' && echo "ok   - hOCR is well-formed XHTML matching the JSON" || { echo "FAIL - hOCR"; fail=1; }
+import json, sys, xml.etree.ElementTree as ET
+ns = {"h": "http://www.w3.org/1999/xhtml"}
+root = ET.parse(sys.argv[1]).getroot()  # raises on malformed XML
+page = json.load(open(sys.argv[2]))
+lines = root.findall(".//h:span[@class='ocr_line']", ns)
+assert len(lines) == len(page["lines"]), (len(lines), len(page["lines"]))
+for hl, jl in zip(lines, page["lines"]):
+    words = hl.findall("h:span[@class='ocrx_word']", ns)
+    assert [w.text for w in words] == [w["text"] for w in jl["words"]]
+    for w, jw in zip(words, jl["words"]):
+        x0, y0, x1, y1 = jw["bbox"]
+        assert w.get("title").startswith(f"bbox {x0} {y0} {x1 + 1} {y1 + 1}; x_wconf "), w.get("title")
+PY
+
 "$CLI" "$ROOT/tests/fixtures/blank.png" >/dev/null 2>&1
 check "blank page exits 3" "3" "$?"
 "$CLI" "$FIX.png" --model-dir /nonexistent >/dev/null 2>&1

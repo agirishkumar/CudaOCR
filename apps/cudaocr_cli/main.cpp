@@ -16,9 +16,10 @@ void usage() {
     std::printf(
         "usage: cudaocr <input-image> [options]\n"
         "Prints the recognized text to stdout (diagnostics go to stderr).\n"
-        "  -o <file>             write output to a file (.json -> JSON, else text)\n"
+        "  -o <file>             write output to a file (.json -> JSON, .hocr/.html -> hOCR,\n"
+        "                        else text)\n"
         "                        JSON schema: docs/output-formats.md\n"
-        "  --format <txt|json>   output format (default: from -o's extension, else txt)\n"
+        "  --format <txt|json|hocr>  output format (default: from -o's extension, else txt)\n"
         "  --no-recognize        detection only (no model needed); output has boxes, no text\n"
         "  --ep <cuda|cpu>       recognizer execution provider (default cuda)\n"
         "  --model-dir <dir>     directory with rec.onnx + dict.txt (default: $CUDAOCR_MODEL_DIR\n"
@@ -177,12 +178,17 @@ int main(int argc, char** argv) {
         usage();
         return 1;
     }
-    if (format.empty())
-        format = outPath.size() >= 5 && outPath.compare(outPath.size() - 5, 5, ".json") == 0
-                     ? "json"
-                     : "txt";
-    if (format != "txt" && format != "json") {
-        std::fprintf(stderr, "error: --format must be txt or json\n");
+    if (format.empty()) {
+        auto endsWith = [&](const char* ext) {
+            const size_t n = std::strlen(ext);
+            return outPath.size() >= n && outPath.compare(outPath.size() - n, n, ext) == 0;
+        };
+        format = endsWith(".json")                        ? "json"
+                 : endsWith(".hocr") || endsWith(".html") ? "hocr"
+                                                          : "txt";
+    }
+    if (format != "txt" && format != "json" && format != "hocr") {
+        std::fprintf(stderr, "error: --format must be txt, json or hocr\n");
         return 1;
     }
 #ifndef CUDAOCR_WITH_ORT
