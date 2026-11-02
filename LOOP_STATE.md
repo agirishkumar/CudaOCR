@@ -25,7 +25,7 @@ lastFailure: (none)
 - M3.3, 2026-11-02, "pipeline: deskew the gray page with the binary page's angle (M3.3)"
 
 ## AWAITING-MERGE
-(none)
+- PR #10 https://github.com/agirishkumar/CudaOCR/pull/10 (task/M3.3-gray-deskew)
 
 ## BLOCKED
 (none)
