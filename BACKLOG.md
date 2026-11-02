@@ -63,8 +63,9 @@ Active milestone: **M3** (MOD complete)
 
 ## M3 — Functional OCR (text out)
 
-- [ ] **M3.1 Synthetic ground-truth fixtures.** `scripts/gen_fixtures.py` (Python + Pillow, seeded): renders pages/lines of known text with DejaVu/Liberation fonts at 300 DPI; variants: clean, skew ±5°, gaussian noise, inverted. Writes `*.png` + `*.gt.txt`. Commit a small set (≤ 2 MB) under `tests/fixtures/synth/`.
+- [x] **M3.1 Synthetic ground-truth fixtures.** `scripts/gen_fixtures.py` (Python + Pillow, seeded): renders pages/lines of known text with DejaVu/Liberation fonts at 300 DPI; variants: clean, skew ±5°, gaussian noise, inverted. Writes `*.png` + `*.gt.txt`. Commit a small set (≤ 2 MB) under `tests/fixtures/synth/`.
   *Accept:* script is deterministic (same seed → identical bytes); existing segmentation finds the expected line count on the committed clean pages.
+  *Done:* 10 fixtures (900 KB) + `--check`/`--set large`; exposed and fixed descender-sliver over-segmentation in `detectLines` (all variants now exact; noise needs Otsu → M3.11).
 - [ ] **M3.2 CER/WER evaluation module + tool.** `src/eval/` Levenshtein-based CER/WER (host C++), `cudaocr-eval <pred_dir> <gt_dir>` → per-file + aggregate table (markdown).
   *Accept:* unit tests on known pairs (identical → 0, one substitution, insert/delete, empty strings, UTF-8 multi-byte).
 - [ ] **M3.3 Gray deskew path.** Pipeline keeps the deskewed gray image (same angle as binary) for recognition; `--dump-stages` writes it.
@@ -84,7 +85,7 @@ Active milestone: **M3** (MOD complete)
 - [ ] **M3.10 Accuracy baseline report.** Run eval on all synthetic variants + 1–2 hand-transcribed `resources/` pages; write `benchmarks/ACCURACY.md`; add a ratchet test that fails if clean-synthetic CER regresses by > 1 point.
   *Accept:* report committed; ratchet test green.
 
-- [ ] **M3.11 Default preprocessing on noisy scans.** Found during MOD.4: with defaults (median 3 + adaptive 31/10) `noisy_text2.png` yields 2 lines vs 9 with Otsu, `noisy_text.png` 3 vs 4. Using the M3.10 CER harness, pick defaults (or an auto-select rule) that maximize recognized text on `resources/` without regressing clean pages; update `PipelineGolden` deliberately with the reason.
+- [ ] **M3.11 Default preprocessing on noisy scans.** Found during MOD.4 (and confirmed on `page_sans_noise`: 1/6 lines with defaults, 6/6 with Otsu): with defaults (median 3 + adaptive 31/10) `noisy_text2.png` yields 2 lines vs 9 with Otsu, `noisy_text.png` 3 vs 4. Using the M3.10 CER harness, pick defaults (or an auto-select rule) that maximize recognized text on `resources/` without regressing clean pages; update `PipelineGolden` deliberately with the reason.
   *Accept:* aggregate CER on `resources/` improves vs M3.10 baseline; clean-synthetic CER unchanged.
 
 ## M4 — Usable product

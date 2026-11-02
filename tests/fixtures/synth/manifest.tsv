@@ -1,0 +1,11 @@
+name	font	size_pt	variant	angle_deg	lines
+page_sans_clean	sans	11	clean	0	8
+page_serif_clean	serif	11	clean	0	8
+page_mono_clean	mono	10	clean	0	8
+page_sans_skew_p3	sans	11	skew	3	8
+page_serif_skew_m4	serif	11	skew	-4	8
+page_sans_noise	sans	12	noise	0	6
+page_serif_inverted	serif	11	inverted	0	8
+line_pangram_sans	sans	12	clean	0	1
+line_digits_serif	serif	12	clean	0	1
+line_punct_mono	mono	12	clean	0	1

@@ -59,6 +59,7 @@ Priorities, in order:
 6. Toolchain drift since June: system now has CUDA toolkit 13.4 (13.1 also installed), driver 595.99 (CUDA 13.2), default host compiler g++ 15.2 (g++-13 removed). The build works with these once #1 is fixed.
 7. ~~**Default-stream transfers raced pipeline kernels.**~~ *Fixed in MOD.4.* Pipeline streams are non-blocking, but uploads/downloads/zero-fills used the default stream, so e.g. the polarity histogram could read a half-uploaded image (~1 in 3 runs) and pipeline tests were order-dependent. Regression tests: `StreamOrdering.*`.
 8. **Default thresholding is weak on noisy scans** (`noisy_text2.png`: 2 lines with defaults vs 9 with `--otsu`). Backlog M3.11.
+9. ~~**Descender slivers split into separate lines.**~~ *Fixed in M3.1.* Below the baseline only a few descender strokes carry ink, so the row count dipped under the ink threshold and descender bottoms became 5–6 px "lines" (10 lines on an 8-line page). `detectLines` now merges slivers (< 1/3 typical height, within 1/3 line) into the adjacent line. Regression tests: `DetectLines.Merges*`, `DetectLines.DoesNotSwallowShortLineBetweenNoiseBlobs`.
 
 ## 5. Full product specification (features by pipeline stage)
 
