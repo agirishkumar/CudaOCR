@@ -30,7 +30,7 @@ Result<std::vector<int>> rowProfile(const DeviceImage& bin, cudaStream_t stream)
         return Status::Error(ErrorCode::InvalidArgument, "rowProfile: 1-channel only");
     auto d_rows = DeviceBuffer<int>::create(bin.height());
     if (!d_rows.ok()) return d_rows.status();
-    Status s = d_rows.value().zero();
+    Status s = d_rows.value().zero(stream);
     if (!s.ok()) return s;
     const dim3 block(32, 8);
     const dim3 grid((bin.width() + block.x - 1) / block.x, (bin.height() + block.y - 1) / block.y);
@@ -39,7 +39,7 @@ Result<std::vector<int>> rowProfile(const DeviceImage& bin, cudaStream_t stream)
     CUDAOCR_CHECK_R(cudaGetLastError());
     CUDAOCR_CHECK_R(cudaStreamSynchronize(stream));
     std::vector<int> rows;
-    s = d_rows.value().download(rows);
+    s = d_rows.value().download(rows, stream);
     if (!s.ok()) return s;
     return rows;
 }
@@ -51,7 +51,7 @@ Result<std::vector<int>> colProfile(const DeviceImage& bin, int y0, int y1, cuda
         return Status::Error(ErrorCode::InvalidArgument, "colProfile: bad row band");
     auto d_cols = DeviceBuffer<int>::create(bin.width());
     if (!d_cols.ok()) return d_cols.status();
-    Status s = d_cols.value().zero();
+    Status s = d_cols.value().zero(stream);
     if (!s.ok()) return s;
     const int bandH = y1 - y0 + 1;
     const dim3 block(32, 8);
@@ -61,7 +61,7 @@ Result<std::vector<int>> colProfile(const DeviceImage& bin, int y0, int y1, cuda
     CUDAOCR_CHECK_R(cudaGetLastError());
     CUDAOCR_CHECK_R(cudaStreamSynchronize(stream));
     std::vector<int> cols;
-    s = d_cols.value().download(cols);
+    s = d_cols.value().download(cols, stream);
     if (!s.ok()) return s;
     return cols;
 }

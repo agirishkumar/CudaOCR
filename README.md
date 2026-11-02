@@ -49,7 +49,7 @@ lines (blue), words (red), and characters (green). See `./build/cudaocr --help`
 for thresholding/deskew options.
 
 Example on `resources/sample.png` (699x921 scan, RTX 3060 Laptop):
-35 lines, 348 words, 903 characters in **4.2 ms** of GPU pipeline time.
+35 lines, 348 words, 903 characters in **~3 ms** of GPU pipeline time (`--benchmark`).
 
 ## Benchmarks (`./build/bench`, 2500x3500, RTX 3060 Laptop, vs NPP)
 

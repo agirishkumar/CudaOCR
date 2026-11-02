@@ -1,23 +1,18 @@
-#include "cudaocr/core/cuda_check.hpp"
 #include "cudaocr/core/device_buffer.cuh"
+#include "cudaocr/core/device_image.cuh"
 #include "cudaocr/core/logger.hpp"
 #include "cudaocr/pipeline.hpp"
-#include "cudaocr/stages/binarize.cuh"
-#include "cudaocr/stages/deskew.cuh"
-#include "cudaocr/stages/enhance.cuh"
-#include "cudaocr/stages/filters.cuh"
-#include "cudaocr/stages/grayscale.cuh"
-#include "cudaocr/stages/segment.cuh"
 
 #include <utility>
 
 namespace cudaocr {
 namespace {
 
-// Times a stage with CUDA events (includes the stream sync the stage may do).
+// Times a call with CUDA events on the pipeline stream (includes any sync the
+// component does) and appends it to the page's timings.
 class StageTimer {
   public:
-    StageTimer(std::vector<StageTime>& sink, cudaStream_t stream) : sink_(sink), stream_(stream) {
+    explicit StageTimer(cudaStream_t stream) : stream_(stream) {
         cudaEventCreate(&start_);
         cudaEventCreate(&stop_);
     }
@@ -25,160 +20,143 @@ class StageTimer {
         cudaEventDestroy(start_);
         cudaEventDestroy(stop_);
     }
+    StageTimer(const StageTimer&) = delete;
+    StageTimer& operator=(const StageTimer&) = delete;
+
     template <typename F>
-    Status timed(const std::string& name, F&& fn) {
+    Status timed(PageResult& page, std::string_view name, F&& fn) {
         cudaEventRecord(start_, stream_);
         Status s = fn();
         cudaEventRecord(stop_, stream_);
         cudaEventSynchronize(stop_);
         float ms = 0;
         cudaEventElapsedTime(&ms, start_, stop_);
-        sink_.push_back({name, ms});
-        if (!s.ok()) Logger::log(LogLevel::Error, "stage '" + name + "': " + s.message);
+        page.timings.push_back({std::string(name), ms});
+        if (!s.ok()) {
+            s.message = std::string(name) + ": " + s.message;
+            Logger::log(LogLevel::Error, "stage " + s.message);
+        }
         return s;
     }
 
   private:
-    std::vector<StageTime>& sink_;
     cudaStream_t stream_;
     cudaEvent_t start_{}, stop_{};
 };
 
+template <typename I>
+Status resolve(const ComponentRegistry& reg, const ComponentSpec& spec, const std::string& slot,
+               std::unique_ptr<I>& out) {
+    auto made = reg.make<I>(spec);
+    if (!made.ok()) return Status::Error(made.status().code, slot + " " + made.status().message);
+    out = made.take();
+    return Status::Good();
+}
+
 }  // namespace
 
-Result<PipelineResult> runPipeline(const HostImage& input, const PipelineConfig& cfg,
-                                   bool keepStages) {
-    if (input.empty()) return Status::Error(ErrorCode::InvalidArgument, "runPipeline: empty input");
+struct Pipeline::Impl {
+    Stream stream;
+    std::unique_ptr<ImageStage> toGray;
+    std::vector<std::unique_ptr<ImageStage>> preprocess;
+    std::unique_ptr<ImageStage> binarizer;
+    std::unique_ptr<Deskewer> deskewer;  // null = skip
+    std::unique_ptr<TextDetector> detector;
+    // Device buffers reused across runs (DeviceImage::ensure).
+    DeviceImage input, a, b, bin, straight;
+};
 
-    PipelineResult result;
-    auto streamRes = Stream::create();
-    if (!streamRes.ok()) return streamRes.status();
-    Stream& stream = streamRes.value();
-    StageTimer timer(result.timings, stream.get());
-    Status s = Status::Good();
+Pipeline::Pipeline(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
+Pipeline::Pipeline(Pipeline&&) noexcept = default;
+Pipeline& Pipeline::operator=(Pipeline&&) noexcept = default;
+Pipeline::~Pipeline() = default;
 
-    // --- upload + grayscale ---
-    DeviceImage gray;
-    if (input.channels == 3) {
-        auto rgb = DeviceImage::fromHost(input);
-        if (!rgb.ok()) return rgb.status();
-        auto g = DeviceImage::create(input.width, input.height, 1);
-        if (!g.ok()) return g.status();
-        gray = g.take();
-        s = timer.timed("grayscale", [&] { return grayscale(rgb.value(), gray, stream.get()); });
-        if (!s.ok()) return s;
-    } else {
-        auto g = DeviceImage::fromHost(input);
-        if (!g.ok()) return g.status();
-        gray = g.take();
+Result<Pipeline> Pipeline::create(const PipelineConfig& cfg, const ComponentRegistry& registry) {
+    auto impl = std::make_unique<Impl>();
+    auto stream = Stream::create();
+    if (!stream.ok()) return stream.status();
+    impl->stream = stream.take();
+
+    Status s = resolve(registry, cfg.toGray, "toGray", impl->toGray);
+    for (size_t i = 0; s.ok() && i < cfg.preprocess.size(); ++i) {
+        std::unique_ptr<ImageStage> st;
+        s = resolve(registry, cfg.preprocess[i], "preprocess[" + std::to_string(i) + "]", st);
+        if (s.ok()) impl->preprocess.push_back(std::move(st));
     }
+    if (s.ok()) s = resolve(registry, cfg.binarizer, "binarizer", impl->binarizer);
+    if (s.ok() && cfg.deskewer) s = resolve(registry, *cfg.deskewer, "deskewer", impl->deskewer);
+    if (s.ok()) s = resolve(registry, cfg.detector, "detector", impl->detector);
+    if (!s.ok()) return s;
+    return Pipeline(std::move(impl));
+}
 
-    // --- optional equalize ---
-    if (cfg.equalize) {
-        auto eq = DeviceImage::create(gray.width(), gray.height(), 1);
-        if (!eq.ok()) return eq.status();
-        s = timer.timed("equalize",
-                        [&] { return histogramEqualize(gray, eq.value(), stream.get()); });
-        if (!s.ok()) return s;
-        gray = eq.take();
-    }
+Result<PageResult> Pipeline::run(const HostImage& input, StageImages* keep) {
+    if (input.empty())
+        return Status::Error(ErrorCode::InvalidArgument, "Pipeline::run: empty input");
+    Impl& m = *impl_;
+    PageResult page;
+    page.width = input.width;
+    page.height = input.height;
+    StageContext ctx{m.stream.get(), &page};
+    StageTimer timer(m.stream.get());
 
-    // --- denoise ---
-    if (cfg.medianK > 0) {
-        auto den = DeviceImage::create(gray.width(), gray.height(), 1);
-        if (!den.ok()) return den.status();
-        s = timer.timed("median",
-                        [&] { return medianFilter(gray, den.value(), cfg.medianK, stream.get()); });
-        if (!s.ok()) return s;
-        gray = den.take();
-    }
+    Status s = m.input.ensure(input.width, input.height, input.channels);
+    if (s.ok()) s = m.input.upload(input, m.stream.get());
+    if (!s.ok()) return s;
 
-    // --- normalize polarity BEFORE binarization: adaptive thresholding
-    // light-on-dark text directly produces halo artifacts, so flip the gray
-    // image when dark pixels dominate. ---
-    s = timer.timed("polarity", [&]() -> Status {
-        auto inv = isInverted(gray, stream.get());
-        if (!inv.ok()) return inv.status();
-        result.wasInverted = inv.value();
-        if (inv.value()) {
-            auto flipped = DeviceImage::create(gray.width(), gray.height(), 1);
-            if (!flipped.ok()) return flipped.status();
-            Status st = invert(gray, flipped.value(), stream.get());
-            if (!st.ok()) return st;
-            gray = flipped.take();
-        }
+    // Ping-pong between a and b; `cur` always points at the latest gray image.
+    const DeviceImage* cur = &m.input;
+    DeviceImage* spare = &m.a;
+    auto step = [&](ImageStage& stage) -> Status {
+        Status st = timer.timed(page, stage.name(), [&] { return stage.run(*cur, *spare, ctx); });
+        if (!st.ok()) return st;
+        cur = spare;
+        spare = (spare == &m.a) ? &m.b : &m.a;
         return Status::Good();
-    });
+    };
+
+    if (input.channels != 1) s = step(*m.toGray);
+    for (size_t i = 0; s.ok() && i < m.preprocess.size(); ++i) s = step(*m.preprocess[i]);
     if (!s.ok()) return s;
-    if (keepStages) {
-        s = gray.download(result.gray);
+    if (keep) {
+        s = cur->download(keep->gray, m.stream.get());
         if (!s.ok()) return s;
     }
 
-    // --- binarize ---
-    auto binRes = DeviceImage::create(gray.width(), gray.height(), 1);
-    if (!binRes.ok()) return binRes.status();
-    DeviceImage bin = binRes.take();
-    if (cfg.useOtsu) {
-        s = timer.timed("otsu", [&]() -> Status {
-            auto t = otsuThreshold(gray, stream.get());
-            if (!t.ok()) return t.status();
-            result.otsuThreshold = t.value();
-            return applyThreshold(gray, bin, t.value(), stream.get());
-        });
-    } else {
-        s = timer.timed("adaptiveThreshold", [&] {
-            return adaptiveThreshold(gray, bin, cfg.blockSize, cfg.C, stream.get());
-        });
-    }
+    s = timer.timed(page, m.binarizer->name(), [&] { return m.binarizer->run(*cur, m.bin, ctx); });
     if (!s.ok()) return s;
-
-    if (keepStages) {
-        s = bin.download(result.binary);
+    if (keep) {
+        s = m.bin.download(keep->binary, m.stream.get());
         if (!s.ok()) return s;
     }
 
-    // --- deskew ---
-    if (cfg.deskew) {
-        s = timer.timed("deskew", [&]() -> Status {
-            auto angle = detectSkewAngle(bin, cfg.maxSkewDeg, cfg.skewStepDeg, stream.get());
+    const DeviceImage* binary = &m.bin;
+    if (m.deskewer) {
+        s = timer.timed(page, m.deskewer->name(), [&]() -> Status {
+            auto angle = m.deskewer->estimate(m.bin, ctx);
             if (!angle.ok()) return angle.status();
-            result.skewAngleDeg = angle.value();
-            if (std::abs(angle.value()) >= cfg.skewStepDeg / 2) {
-                auto straight = DeviceImage::create(bin.width(), bin.height(), 1);
-                if (!straight.ok()) return straight.status();
-                Status st = rotate(bin, straight.value(), -angle.value(), 255, stream.get());
-                if (!st.ok()) return st;
-                bin = straight.take();
-            }
-            return Status::Good();
+            page.skewDeg = angle.value();
+            return m.deskewer->apply(-angle.value(), m.bin, m.straight, 255, ctx);
         });
         if (!s.ok()) return s;
+        binary = &m.straight;
     }
-    if (keepStages) {
-        s = bin.download(result.deskewed);
+    if (keep) {
+        s = binary->download(keep->deskewed, m.stream.get());
         if (!s.ok()) return s;
     }
 
-    // --- segmentation ---
-    s = timer.timed("segment", [&]() -> Status {
-        auto rows = rowProfile(bin, stream.get());
-        if (!rows.ok()) return rows.status();
-        result.lines = detectLines(rows.value(), bin.width(), cfg.minLineHeight);
-        for (auto& line : result.lines) {
-            Status st = segmentLine(bin, line, stream.get());
-            if (!st.ok()) return st;
-            result.wordCount += static_cast<int>(line.words.size());
-            for (const auto& wbox : line.words)
-                result.charCount += static_cast<int>(wbox.chars.size());
-        }
+    s = timer.timed(page, m.detector->name(), [&]() -> Status {
+        auto lines = m.detector->detect(*binary, ctx);
+        if (!lines.ok()) return lines.status();
+        page.lines = lines.take();
         return Status::Good();
     });
     if (!s.ok()) return s;
 
-    s = stream.synchronize();
+    s = m.stream.synchronize();
     if (!s.ok()) return s;
-    return result;
+    return page;
 }
 
 }  // namespace cudaocr
