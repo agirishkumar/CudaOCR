@@ -80,11 +80,13 @@ add_executable(unit_tests
   tests/unit/stage_adapters_test.cu
   tests/integration/pipeline_test.cu
   tests/integration/pipeline_golden_test.cu
+  tests/integration/synth_fixtures_test.cu
 )
 target_link_libraries(unit_tests PRIVATE cudaocr_lib gtest gtest_main)
 target_include_directories(unit_tests PRIVATE tests)
 target_compile_definitions(unit_tests PRIVATE
-  CUDAOCR_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources")
+  CUDAOCR_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources"
+  CUDAOCR_SYNTH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/synth")
 set_target_properties(unit_tests PROPERTIES
   CUDA_SEPARABLE_COMPILATION ON
   RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
@@ -106,6 +108,9 @@ add_test(NAME Cli.BadParamIsConfigError
 set_tests_properties(Cli.BadParamIsConfigError PROPERTIES WILL_FAIL TRUE)
 
 # Tooling tests (verify gate helpers).
+add_test(NAME Scripts.GenFixtures
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/gen_fixtures_test.sh)
+set_tests_properties(Scripts.GenFixtures PROPERTIES SKIP_RETURN_CODE 77)
 add_test(NAME Scripts.ChangedFiles
          COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/changed_files_test.sh)
 

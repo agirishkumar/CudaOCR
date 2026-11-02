@@ -40,6 +40,51 @@ TEST(DetectLines, FindsSyntheticLines) {
     EXPECT_EQ(lines[0].y1, 47);
 }
 
+// Regression (found by M3.1's synthetic fixtures): just below the baseline only
+// a few thin descender strokes carry ink, so the row count can dip under the
+// ink threshold and the descender bottoms (g, y, p) became a separate 5-6 px
+// "line" — 10 lines detected on an 8-line page. Slivers much thinner than the
+// typical line and close to a neighbour are merged into the nearest line.
+std::vector<int> bands(int h, std::initializer_list<std::pair<int, int>> inkRows) {
+    std::vector<int> counts(h, 0);
+    for (auto [y0, y1] : inkRows)
+        for (int y = y0; y <= y1; ++y) counts[y] = 50;
+    return counts;
+}
+
+TEST(DetectLines, MergesDescenderSliverIntoLineAbove) {
+    // line 10-44, gap of 5 rows, sliver 50-54, then lines 80-114 and 150-184.
+    const auto lines = detectLines(bands(200, {{10, 44}, {50, 54}, {80, 114}, {150, 184}}), 400);
+    ASSERT_EQ(lines.size(), 3u);
+    EXPECT_EQ(lines[0].y0, 10);
+    EXPECT_EQ(lines[0].y1, 54);  // sliver absorbed
+    EXPECT_EQ(lines[1].y0, 80);
+}
+
+TEST(DetectLines, MergesTittleSliverIntoLineBelow) {
+    // i/j dots above a line with no ascenders: sliver 20-24, gap 3, line 28-55.
+    const auto lines = detectLines(bands(120, {{20, 24}, {28, 55}, {85, 112}}), 400);
+    ASSERT_EQ(lines.size(), 2u);
+    EXPECT_EQ(lines[0].y0, 20);
+    EXPECT_EQ(lines[0].y1, 55);
+}
+
+TEST(DetectLines, KeepsSmallBandsFarFromAnyLine) {
+    // A short isolated band (e.g. a rule or a page number) stays its own line.
+    const auto lines = detectLines(bands(300, {{10, 44}, {150, 155}, {250, 284}}), 400);
+    ASSERT_EQ(lines.size(), 3u);
+    EXPECT_EQ(lines[1].y0, 150);
+}
+
+TEST(DetectLines, DoesNotSwallowShortLineBetweenNoiseBlobs) {
+    // Bands measured on resources/noisy_text.png (adaptive threshold): a real
+    // 24-row text line between noise blobs must survive (median height is 55).
+    const auto lines = detectLines(bands(343, {{5, 59}, {66, 89}, {92, 337}}), 727);
+    ASSERT_EQ(lines.size(), 3u);
+    EXPECT_EQ(lines[1].y0, 66);
+    EXPECT_EQ(lines[1].y1, 89);
+}
+
 TEST(DetectLines, IgnoresShortRunsAndBlankPages) {
     std::vector<int> counts(100, 0);
     counts[50] = 99;  // single-row speckle, below minHeight
