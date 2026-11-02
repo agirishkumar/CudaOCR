@@ -23,14 +23,14 @@ __global__ void rowSumKernel(const std::uint8_t* __restrict__ in, size_t pitch,
     tmp[static_cast<size_t>(y) * w + x] = s;
 }
 
-__global__ void colMeanKernel(const std::uint32_t* __restrict__ tmp,
-                              std::uint8_t* __restrict__ out, size_t outPitch, int w, int h, int r,
-                              std::uint32_t n) {
+__global__ void colMeanKernel(const std::uint32_t* __restrict__ tmp, std::uint8_t* __restrict__ out,
+                              size_t outPitch, int w, int h, int r, std::uint32_t n) {
     const int x = blockIdx.x * blockDim.x + threadIdx.x;
     const int y = blockIdx.y * blockDim.y + threadIdx.y;
     if (x >= w || y >= h) return;
     std::uint32_t s = 0;
-    for (int dy = -r; dy <= r; ++dy) s += tmp[static_cast<size_t>(clampi(y + dy, 0, h - 1)) * w + x];
+    for (int dy = -r; dy <= r; ++dy)
+        s += tmp[static_cast<size_t>(clampi(y + dy, 0, h - 1)) * w + x];
     out[static_cast<size_t>(y) * outPitch + x] = static_cast<std::uint8_t>((s + n / 2) / n);
 }
 
@@ -150,9 +150,8 @@ Status gaussianBlur(const DeviceImage& in, DeviceImage& out, int ksize, double s
     const dim3 block(32, 8);
     const dim3 grid = gridFor(in, block);
     const int r = ksize / 2;
-    gaussPassKernel<true><<<grid, block, 0, stream>>>(in.data(), in.pitch(), tmp.value().data(),
-                                                      tmp.value().pitch(), in.width(), in.height(),
-                                                      r);
+    gaussPassKernel<true><<<grid, block, 0, stream>>>(
+        in.data(), in.pitch(), tmp.value().data(), tmp.value().pitch(), in.width(), in.height(), r);
     CUDAOCR_CHECK_LAUNCH("gaussPassKernel<horizontal>");
     gaussPassKernel<false><<<grid, block, 0, stream>>>(tmp.value().data(), tmp.value().pitch(),
                                                        out.data(), out.pitch(), in.width(),

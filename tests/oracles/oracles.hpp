@@ -30,7 +30,7 @@ HostImage randomImage(int w, int h, int ch, std::uint32_t seed);
 // Synthetic "document": white page with 3 lines of word-like black boxes,
 // each word split into character boxes. Returns the expected counts.
 struct SyntheticPage {
-    HostImage image;                    // 1-channel, text black (0) on white (255)
+    HostImage image;  // 1-channel, text black (0) on white (255)
     int lineCount;
     std::vector<int> wordsPerLine;
     std::vector<int> charsPerLine;
