@@ -89,6 +89,18 @@ if(CUDAOCR_WITH_ORT)
   message(STATUS "ONNX Runtime: ${CUDAOCR_ORT_ROOT}")
 endif()
 
+# toml++ (header-only, MIT) for config files; only src/config.cpp includes it.
+FetchContent_Declare(
+  tomlplusplus
+  URL https://github.com/marzer/tomlplusplus/archive/refs/tags/v3.4.0.tar.gz
+  URL_HASH SHA256=8517f65938a4faae9ccf8ebb36631a38c1cadfb5efa85d9a72e15b9e97d25155
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+  SOURCE_SUBDIR no-cmake  # header-only: populate only
+)
+FetchContent_MakeAvailable(tomlplusplus)
+target_sources(cudaocr_lib PRIVATE src/config.cpp)
+target_include_directories(cudaocr_lib SYSTEM PRIVATE ${tomlplusplus_SOURCE_DIR}/include)
+
 # The ORT-backed recognizer is part of the library when ORT is enabled.
 if(CUDAOCR_WITH_ORT)
   target_sources(cudaocr_lib PRIVATE src/components/onnx_line_recognizer.cpp)
@@ -121,6 +133,7 @@ add_executable(unit_tests
   tests/unit/txt_formatter_test.cpp
   tests/unit/json_formatter_test.cpp
   tests/unit/hocr_formatter_test.cpp
+  tests/unit/config_test.cpp
   tests/unit/words_from_ctc_test.cpp
   tests/unit/components_test.cpp
   tests/unit/device_test.cu
@@ -233,6 +246,8 @@ if(CUDAOCR_WITH_ORT)
                    sherlock noisy_text noisy_text2 vigorous-before)
   set_tests_properties(Accuracy.RealScansRatchet PROPERTIES SKIP_RETURN_CODE 77)
 endif()
+add_test(NAME Cli.Config COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/cli_config_test.sh
+                                 $<TARGET_FILE:cudaocr>)
 add_test(NAME Cli.BlankPageDetectOnlyExits3
          COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/blank.png --no-recognize)
 set_tests_properties(Cli.BlankPageDetectOnlyExits3 PROPERTIES WILL_FAIL TRUE)

@@ -1,9 +1,12 @@
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <string>
 
+#include "cudaocr/config.hpp"
 #include "cudaocr/core/host_image.hpp"
 #include "cudaocr/core/logger.hpp"
 #include "cudaocr/pipeline.hpp"
@@ -16,6 +19,8 @@ void usage() {
     std::printf(
         "usage: cudaocr <input-image> [options]\n"
         "Prints the recognized text to stdout (diagnostics go to stderr).\n"
+        "  --config <file.toml>  pipeline config (docs/config.md); flags below override it\n"
+        "  --print-config        print the effective config as TOML and exit\n"
         "  -o <file>             write output to a file (.json -> JSON, .hocr/.html -> hOCR,\n"
         "                        else text)\n"
         "                        JSON schema: docs/output-formats.md\n"
@@ -63,48 +68,65 @@ int glyphCount(const PageResult& page) {
     return n;
 }
 
-// CLI knobs, kept as text so the components' Params validation reports bad
-// values (e.g. "--median 4") instead of atoi silently turning them into 0.
-struct Knobs {
-    std::string median = "3";  // "0" = off
-    bool equalize = false;
-    bool otsu = false;
-    std::string blockSize, C;  // empty = component default
-    bool deskew = true;
-#ifdef CUDAOCR_WITH_ORT
-    bool recognize = true;
-#else
-    bool recognize = false;  // built without ONNX Runtime
-#endif
-    std::string ep = "cuda";
-    std::string modelDir;  // empty = recognizer default
-    bool tf32 = false;
+// Command-line overrides, applied on top of the defaults and --config. Values
+// stay text so the components' Params validation reports bad ones (e.g.
+// "--median 4") instead of atoi silently turning them into 0. Only flags that
+// were given change anything.
+struct Overrides {
+    std::optional<std::string> median, blockSize, C, ep, modelDir;
+    bool equalize = false, otsu = false, noDeskew = false, noRecognize = false, tf32 = false;
 };
 
-PipelineConfig toConfig(const Knobs& k) {
+// CLI defaults: the library defaults plus recognition when built with ORT.
+PipelineConfig cliDefaults() {
     PipelineConfig cfg;
-    cfg.preprocess.clear();
-    cfg.binarizePrep.clear();
-    if (k.equalize) cfg.preprocess.push_back({"equalize", {}});
-    if (k.median != "0") cfg.preprocess.push_back({"median", Params().set("k", k.median)});
-    cfg.preprocess.push_back({"polarity", {}});
-    if (k.otsu) {
-        cfg.binarizer = {"otsu", {}};
-    } else {
-        Params p;
-        if (!k.blockSize.empty()) p.set("blockSize", k.blockSize);
-        if (!k.C.empty()) p.set("C", k.C);
-        cfg.binarizer = {"adaptive", p};
-    }
-    if (!k.deskew) cfg.deskewer.reset();
-    if (k.recognize) {
-        Params p;
-        p.set("ep", k.ep).set("tf32", k.tf32);
-        if (!k.modelDir.empty())
-            p.set("model", k.modelDir + "/rec.onnx").set("dict", k.modelDir + "/dict.txt");
-        cfg.recognizer = ComponentSpec{"onnx", p};
-    }
+#ifdef CUDAOCR_WITH_ORT
+    cfg.recognizer = ComponentSpec{"onnx", {}};
+#endif
     return cfg;
+}
+
+Status applyOverrides(PipelineConfig& cfg, const Overrides& o) {
+    auto find = [&](const char* name) {
+        return std::find_if(cfg.preprocess.begin(), cfg.preprocess.end(),
+                            [&](const ComponentSpec& s) { return s.name == name; });
+    };
+    if (o.median) {
+        auto it = find("median");
+        if (*o.median == "0") {
+            if (it != cfg.preprocess.end()) cfg.preprocess.erase(it);
+        } else if (it != cfg.preprocess.end()) {
+            it->params.set("k", *o.median);
+        } else {
+            cfg.preprocess.insert(cfg.preprocess.begin(),
+                                  ComponentSpec{"median", Params().set("k", *o.median)});
+        }
+    }
+    if (o.equalize && find("equalize") == cfg.preprocess.end())
+        cfg.preprocess.insert(cfg.preprocess.begin(), ComponentSpec{"equalize", {}});
+    if (o.otsu && (o.blockSize || o.C))
+        return Status::Error(ErrorCode::InvalidArgument,
+                             "--otsu conflicts with --block-size/--C (adaptive threshold)");
+    if (o.otsu) cfg.binarizer = {"otsu", {}};
+    if (o.blockSize || o.C) {
+        if (cfg.binarizer.name != "adaptive") cfg.binarizer = {"adaptive", {}};
+        if (o.blockSize) cfg.binarizer.params.set("blockSize", *o.blockSize);
+        if (o.C) cfg.binarizer.params.set("C", *o.C);
+    }
+    if (o.noDeskew) cfg.deskewer.reset();
+    if (o.noRecognize) cfg.recognizer.reset();
+    if (o.ep || o.modelDir || o.tf32) {
+        if (!cfg.recognizer) {
+            std::fprintf(stderr, "warn: recognition is off; --ep/--model-dir/--tf32 ignored\n");
+        } else {
+            Params& p = cfg.recognizer->params;
+            if (o.ep) p.set("ep", *o.ep);
+            if (o.tf32) p.set("tf32", true);
+            if (o.modelDir)
+                p.set("model", *o.modelDir + "/rec.onnx").set("dict", *o.modelDir + "/dict.txt");
+        }
+    }
+    return Status::Good();
 }
 
 }  // namespace
@@ -114,9 +136,9 @@ int main(int argc, char** argv) {
         usage();
         return 1;
     }
-    std::string input, outPath, format, dumpDir;
-    bool verbose = false;
-    Knobs knobs;
+    std::string input, outPath, format, dumpDir, configPath;
+    bool verbose = false, printConfig = false;
+    Overrides knobs;
     bool benchmark = false;
     LogLevel level = LogLevel::Info;
 
@@ -128,13 +150,17 @@ int main(int argc, char** argv) {
         } else if (a == "--format") {
             if (const char* v = next()) format = v;
         } else if (a == "--no-recognize") {
-            knobs.recognize = false;
+            knobs.noRecognize = true;
         } else if (a == "--ep") {
             if (const char* v = next()) knobs.ep = v;
         } else if (a == "--model-dir") {
             if (const char* v = next()) knobs.modelDir = v;
         } else if (a == "--tf32") {
             knobs.tf32 = true;
+        } else if (a == "--config") {
+            if (const char* v = next()) configPath = v;
+        } else if (a == "--print-config") {
+            printConfig = true;
         } else if (a == "-v" || a == "--verbose") {
             verbose = true;
         } else if (a == "--dump-stages") {
@@ -150,7 +176,7 @@ int main(int argc, char** argv) {
         } else if (a == "--equalize") {
             knobs.equalize = true;
         } else if (a == "--no-deskew") {
-            knobs.deskew = false;
+            knobs.noDeskew = true;
         } else if (a == "--benchmark") {
             benchmark = true;
         } else if (a == "--log-level") {
@@ -174,6 +200,23 @@ int main(int argc, char** argv) {
             return 1;
         }
     }
+    PipelineConfig cfg = cliDefaults();
+    if (!configPath.empty()) {
+        auto loaded = loadPipelineConfig(configPath, cfg);
+        if (!loaded.ok()) {
+            std::fprintf(stderr, "config error: %s\n", loaded.status().message.c_str());
+            return 1;
+        }
+        cfg = loaded.take();
+    }
+    if (Status s = applyOverrides(cfg, knobs); !s.ok()) {
+        std::fprintf(stderr, "config error: %s\n", s.message.c_str());
+        return 1;
+    }
+    if (printConfig) {
+        std::fputs(toToml(cfg).c_str(), stdout);
+        return 0;
+    }
     if (input.empty()) {
         usage();
         return 1;
@@ -191,10 +234,6 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "error: --format must be txt, json or hocr\n");
         return 1;
     }
-#ifndef CUDAOCR_WITH_ORT
-    if (knobs.ep != "cuda" || !knobs.modelDir.empty() || knobs.tf32)
-        std::fprintf(stderr, "warn: built without ONNX Runtime; recognizer options ignored\n");
-#endif
 
     // Only litter a log file when explicitly debugging; warnings/errors hit stderr anyway.
     if (level <= LogLevel::Debug) Logger::init("cudaocr.log");
@@ -207,7 +246,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    auto pipeline = Pipeline::create(toConfig(knobs));
+    auto pipeline = Pipeline::create(cfg);
     if (!pipeline.ok()) {
         std::fprintf(stderr, "config error: %s\n", pipeline.status().message.c_str());
         return 1;
@@ -225,7 +264,7 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "image:        %dx%d (%d channel%s)\n", img.value().width,
                      img.value().height, img.value().channels, img.value().channels > 1 ? "s" : "");
         std::fprintf(stderr, "skew angle:   %+.2f deg%s\n", r.skewDeg,
-                     knobs.deskew ? " (corrected)" : "");
+                     cfg.deskewer ? " (corrected)" : "");
         if (auto it = r.metrics.find("otsu.threshold"); it != r.metrics.end())
             std::fprintf(stderr, "otsu thresh:  %d\n", static_cast<int>(it->second));
         std::fprintf(stderr, "polarity:     %s\n",
@@ -296,6 +335,6 @@ int main(int argc, char** argv) {
     Logger::close();
     // 3 = nothing found: no text when recognizing, no lines when detecting only.
     bool found = false;
-    for (const auto& l : r.lines) found = found || !knobs.recognize || !l.text.empty();
+    for (const auto& l : r.lines) found = found || !cfg.recognizer || !l.text.empty();
     return found ? 0 : 3;
 }
