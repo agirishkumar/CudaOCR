@@ -1,6 +1,6 @@
 # LOOP_STATE — machine state for /engineer-step iterations
 
-Active milestone: M3 (next unchecked task: M3.5 model fetch + model card)
+Active milestone: M3 (next unchecked task: M3.6 line crop + normalize kernel)
 
 CURRENT: (none)
 branch: (none)
@@ -23,10 +23,11 @@ lastFailure: (none)
 - M3.1, 2026-11-02, "fixtures: synthetic ground-truth generator; merge descender slivers (M3.1)" — PR #8 merged
 - M3.2, 2026-11-02, "eval: CER/WER metrics and cudaocr-eval tool (M3.2)" — PR #9 merged
 - M3.3, 2026-11-02, "pipeline: deskew the gray page with the binary page's angle (M3.3)" — PR #10 merged
-- M3.4, 2026-11-02, "build: add pinned ONNX Runtime 1.31.1 (CUDA 13) dependency (M3.4)"
+- M3.4, 2026-11-02, "build: add pinned ONNX Runtime 1.31.1 (CUDA 13) dependency (M3.4)" — PR #11 merged
+- M3.5, 2026-11-02, "models: pinned PP-OCRv5 English recognizer fetch + model card (M3.5)"
 
 ## AWAITING-MERGE
-- PR #11 https://github.com/agirishkumar/CudaOCR/pull/11 (task/M3.4-onnxruntime)
+- PR #12 https://github.com/agirishkumar/CudaOCR/pull/12 (task/M3.5-model-fetch)
 
 ## BLOCKED
 (none)

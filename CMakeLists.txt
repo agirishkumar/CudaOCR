@@ -118,14 +118,15 @@ add_executable(unit_tests
 )
 target_link_libraries(unit_tests PRIVATE cudaocr_lib gtest gtest_main)
 if(CUDAOCR_WITH_ORT)
-  target_sources(unit_tests PRIVATE tests/unit/ort_smoke_test.cpp)
+  target_sources(unit_tests PRIVATE tests/unit/ort_smoke_test.cpp tests/unit/rec_model_test.cpp)
   target_link_libraries(unit_tests PRIVATE onnxruntime::onnxruntime)
 endif()
 target_include_directories(unit_tests PRIVATE tests)
 target_compile_definitions(unit_tests PRIVATE
   CUDAOCR_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources"
   CUDAOCR_SYNTH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/synth"
-  CUDAOCR_ONNX_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/onnx")
+  CUDAOCR_ONNX_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/onnx"
+  CUDAOCR_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/models")
 set_target_properties(unit_tests PROPERTIES
   CUDA_SEPARABLE_COMPILATION ON
   RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
