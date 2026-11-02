@@ -178,6 +178,7 @@ struct Formatter { virtual std::string_view extension() const = 0;
 | `otsu` | ImageStage | `OtsuBinarizer` | — (`lastThreshold()`) |
 | `hough` | Deskewer | `HoughDeskewer` | `maxAngle` (0, 45] (15), `step` (0, maxAngle] (0.25); \|angle\| < step/2 → copy |
 | `projection` | TextDetector | `ProjectionDetector` | `minLineHeight` ≥ 1 (3) |
+| `ctc-greedy` | Decoder | `CtcGreedyDecoder` | — (conf = mean prob of emitted symbols) |
 
 Core support: `DeviceImage::ensure(w, h, ch)` reuses a matching allocation; `DeviceImage::copyTo(dst, stream)` for pass-through stages.
 
