@@ -20,7 +20,7 @@ lastFailure: (none)
 - MOD.2, 2026-11-02, "components: add stage interfaces and Params (MOD.2)"
 
 ## AWAITING-MERGE
-(none)
+- PR #5 https://github.com/agirishkumar/CudaOCR/pull/5 (task/MOD.2-component-interfaces)
 
 ## BLOCKED
 (none)
