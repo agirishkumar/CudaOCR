@@ -22,6 +22,37 @@ TEST(CudaArch, CudaArchMatchesDevice) {
             << "kernels built for an older virtual arch; set CMAKE_CUDA_ARCHITECTURES";
 }
 
+TEST(DeviceImage, EnsureKeepsMatchingAllocation) {
+    auto img = DeviceImage::create(40, 30, 1);
+    ASSERT_TRUE(img.ok());
+    const auto* before = img.value().data();
+    ASSERT_TRUE(img.value().ensure(40, 30, 1).ok());
+    EXPECT_EQ(img.value().data(), before);  // no realloc churn between runs
+}
+
+TEST(DeviceImage, EnsureAllocatesEmptyAndReshapesMismatched) {
+    DeviceImage img;
+    ASSERT_TRUE(img.ensure(16, 8, 3).ok());
+    EXPECT_EQ(img.width(), 16);
+    EXPECT_EQ(img.height(), 8);
+    EXPECT_EQ(img.channels(), 3);
+    ASSERT_TRUE(img.ensure(5, 7, 1).ok());
+    EXPECT_EQ(img.width(), 5);
+    EXPECT_EQ(img.channels(), 1);
+    EXPECT_FALSE(img.ensure(0, 7, 1).ok());
+}
+
+TEST(DeviceImage, CopyToIsByteExactAndAllocates) {
+    const HostImage host = oracle::randomImage(37, 19, 3, /*seed=*/7);
+    auto src = DeviceImage::fromHost(host);
+    ASSERT_TRUE(src.ok());
+    DeviceImage dst;
+    ASSERT_TRUE(src.value().copyTo(dst).ok());
+    HostImage back;
+    ASSERT_TRUE(dst.download(back).ok());
+    EXPECT_TRUE(testutil::imagesEqual(back, host));
+}
+
 TEST(DeviceBuffer, RoundTrip) {
     auto buf = DeviceBuffer<int>::create(1024);
     ASSERT_TRUE(buf.ok()) << buf.status().message;
