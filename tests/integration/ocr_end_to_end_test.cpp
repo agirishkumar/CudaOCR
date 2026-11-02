@@ -98,6 +98,42 @@ TEST(OcrEndToEnd, CpuAndCudaGiveTheSameText) {
     EXPECT_EQ(ocr(cpu.value(), page), ocr(cuda.value(), page));
 }
 
+// M4.1: word boxes from CTC timesteps agree with the detector's projection-gap
+// boxes, which are accurate on clean synthetic pages. Measured: mean horizontal
+// IoU 0.935, min 0.809 on page_sans_clean (0.88 / 0.70 before half-step padding).
+TEST(OcrEndToEnd, RecognizedWordBoxesMatchDetectorOnCleanPage) {
+    REQUIRE_MODEL();
+    auto det = Pipeline::create(PipelineConfig{});
+    auto rec = Pipeline::create(ocrConfig());
+    ASSERT_TRUE(det.ok() && rec.ok());
+    auto img = loadImage((fs::path(CUDAOCR_SYNTH_DIR) / "page_sans_clean.png").string());
+    ASSERT_TRUE(img.ok());
+    auto a = det.value().run(img.value());
+    auto b = rec.value().run(img.value());
+    ASSERT_TRUE(a.ok() && b.ok());
+    ASSERT_EQ(a.value().lines.size(), b.value().lines.size());
+    double sum = 0, minIoU = 1;
+    int n = 0;
+    for (size_t i = 0; i < a.value().lines.size(); ++i) {
+        const auto& wa = a.value().lines[i].words;
+        const auto& wb = b.value().lines[i].words;
+        ASSERT_EQ(wa.size(), wb.size()) << "line " << i;
+        for (size_t k = 0; k < wa.size(); ++k) {
+            EXPECT_FALSE(wb[k].text.empty());
+            EXPECT_GT(wb[k].conf, 0.5f);
+            const int inter = std::max(
+                0, std::min(wa[k].box.x1, wb[k].box.x1) - std::max(wa[k].box.x0, wb[k].box.x0) + 1);
+            const double iou =
+                double(inter) / double(wa[k].box.width() + wb[k].box.width() - inter);
+            sum += iou;
+            minIoU = std::min(minIoU, iou);
+            ++n;
+        }
+    }
+    EXPECT_GE(sum / n, 0.9);
+    EXPECT_GE(minIoU, 0.75);
+}
+
 TEST(OcrEndToEnd, UnknownRecognizerFailsAtCreate) {
     PipelineConfig cfg;
     cfg.recognizer = ComponentSpec{"tesseract", {}};
