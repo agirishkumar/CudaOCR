@@ -79,6 +79,10 @@ set_target_properties(unit_tests PROPERTIES
 include(GoogleTest)
 gtest_discover_tests(unit_tests DISCOVERY_TIMEOUT 60)
 
+# Tooling tests (verify gate helpers).
+add_test(NAME Scripts.ChangedFiles
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/changed_files_test.sh)
+
 # ---- benchmarks (custom kernels vs NPP _Ctx) ----
 add_executable(bench benchmarks/bench.cu)
 target_link_libraries(bench PRIVATE cudaocr_lib CUDA::nppif CUDA::nppicc CUDA::nppig CUDA::nppc)

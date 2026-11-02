@@ -1,8 +1,20 @@
 #!/usr/bin/env bash
 # CudaOCR verification gate — the loop's verification condition.
 # Exit 0 = iteration may progress; non-zero = retry.
+# Usage: verify.sh [--full]   (--full: memcheck even when no kernel files changed)
+# Changed files are everything the branch touches vs its merge-base with
+# origin/main (see scripts/changed_files.sh), so committed work on a task branch
+# is still checked.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
+
+FULL=0
+for arg in "$@"; do
+    case "$arg" in
+        --full) FULL=1 ;;
+        *) echo "unknown argument: $arg" >&2; exit 2 ;;
+    esac
+done
 
 echo "== [1/4] configure + build =="
 cmake -B build -DCMAKE_BUILD_TYPE=Release >/dev/null
@@ -11,9 +23,11 @@ cmake --build build -j"$(nproc)"
 echo "== [2/4] tests =="
 ctest --test-dir build --output-on-failure
 
-echo "== [3/4] memcheck (only if .cu/.cuh changed vs HEAD) =="
+echo "== [3/4] memcheck (if .cu/.cuh changed vs branch base, or --full) =="
 SANITIZER="${SANITIZER:-/usr/local/cuda/bin/compute-sanitizer}"
-if git diff HEAD --name-only -- '*.cu' '*.cuh' | grep -q . ; then
+KERNELS=$(scripts/changed_files.sh '*.cu' '*.cuh')
+if [ "$FULL" -eq 1 ] || [ -n "$KERNELS" ]; then
+    [ -n "$KERNELS" ] && echo "changed kernel files:" $KERNELS
     if [ -x "$SANITIZER" ]; then
         # --report-api-errors no: the CudaCheck test triggers an API error on purpose;
         # memory violations are still fully reported.
@@ -27,8 +41,9 @@ else
 fi
 
 echo "== [4/4] formatting =="
-CHANGED=$(git diff HEAD --name-only -- '*.cu' '*.cuh' '*.hpp' '*.cpp' '*.h' || true)
+CHANGED=$(scripts/changed_files.sh '*.cu' '*.cuh' '*.hpp' '*.cpp' '*.h')
 if [ -n "$CHANGED" ] && command -v clang-format >/dev/null; then
+    echo "checking:" $CHANGED
     # shellcheck disable=SC2086
     clang-format --dry-run --Werror $CHANGED
 else
