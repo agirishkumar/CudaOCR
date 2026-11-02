@@ -37,7 +37,7 @@ lastFailure: (none)
 - M4.4, 2026-11-02, "cli: multi-page input with one pipeline per run (M4.4)"
 
 ## AWAITING-MERGE
-(none)
+- PR #15 https://github.com/agirishkumar/CudaOCR/pull/15 (task/M4.1-M4.4-usable-product)
 
 ## BLOCKED
 (none)
