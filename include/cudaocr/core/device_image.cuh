@@ -22,6 +22,12 @@ class DeviceImage {
     static Result<DeviceImage> create(int width, int height, int channels);
     static Result<DeviceImage> fromHost(const HostImage& host);
 
+    // Keeps the allocation if the shape already matches, otherwise (re)allocates.
+    // Contents are unspecified afterwards.
+    Status ensure(int width, int height, int channels);
+    // Device-to-device copy into `dst` (allocated/reshaped as needed).
+    Status copyTo(DeviceImage& dst, cudaStream_t stream = nullptr) const;
+
     Status upload(const HostImage& host);
     Status download(HostImage& host) const;
 
