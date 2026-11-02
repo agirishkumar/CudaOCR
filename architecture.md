@@ -129,38 +129,38 @@ protected:
 } // namespace cudaocr
 ```
 
-### 6.1 Component interfaces (MOD milestone — supersedes the `StageBase` sketch above)
+### 6.1 Component interfaces (MOD.2 — supersedes the `StageBase` sketch above)
+
+Headers in `include/cudaocr/components/`, all host-only (they forward-declare `DeviceImage`; a test asserts it stays incomplete there):
 
 ```cpp
 namespace cudaocr {
-// Typed key/value parameters parsed from TOML/CLI; getters return Result<T> with a clear error.
-class Params { /* get<int>("blockSize", 31), get<std::string>("ep", "cuda") ... */ };
+// params.hpp — text values (from CLI/TOML), parsed on read:
+//   get<int|float|double|bool|std::string>(key, fallback) -> Result<T>
+//   bad value -> InvalidArgument naming key + raw value; requireKnown({...}) rejects typos.
+class Params;
 
-struct StageContext { cudaStream_t stream; Logger* log; };
+// stage_context.hpp — per-run state.
+struct StageContext { CUstream_st* stream /* == cudaStream_t */; PageResult* page /* metadata sink, may be null */; };
 
-// Image -> image (grayscale, denoise, equalize, polarity, binarize). Pure, no hidden state.
-struct ImageStage {
-    virtual ~ImageStage() = default;
-    virtual std::string_view name() const = 0;
+struct ImageStage {      // grayscale, denoise, equalize, polarity, binarize; allocates `out` as needed
     virtual Status run(const DeviceImage& in, DeviceImage& out, StageContext&) = 0;
 };
-
-// Binary page -> line regions in reading order (projection now, DBNet later).
-struct TextDetector {
-    virtual Result<std::vector<LineRegion>> detect(const DeviceImage& bin, StageContext&) = 0;
+struct Deskewer {        // estimate once from binary, apply to binary AND gray
+    virtual Result<float> estimate(const DeviceImage& binary, StageContext&) = 0;
+    virtual Status apply(float deg, const DeviceImage& in, DeviceImage& out, uint8_t border, StageContext&) = 0;
 };
-
-// Gray page + regions -> per-line logits [T x C] (ORT now, custom CUDA in M5).
-struct LineRecognizer {
-    virtual Result<std::vector<Logits>> recognize(const DeviceImage& gray,
-                                                  std::span<const LineRegion>, StageContext&) = 0;
+struct TextDetector {    // geometry only: LineResult boxes (+ word boxes) in reading order, text empty
+    virtual Result<std::vector<LineResult>> detect(const DeviceImage& binary, StageContext&) = 0;
+};
+struct LineRecognizer {  // output i <-> lines[i]; emits probabilities, not raw logits
     virtual const Charset& charset() const = 0;
+    virtual Result<std::vector<CtcProbs>> recognize(const DeviceImage& gray, std::span<const LineResult>, StageContext&) = 0;
 };
-
-struct Decoder   { virtual Result<std::vector<Decoded>> decode(std::span<const Logits>, const Charset&) = 0; };
-struct Formatter { virtual Result<std::string> format(const PageResult&) = 0; };
-
-// Pipeline owns one instance of each selected component, created by name via ComponentRegistry.
+struct Decoder   { virtual Result<DecodedLine> decode(const CtcProbs&, const Charset&) = 0; };   // text, conf, per-symbol timesteps
+struct Formatter { virtual std::string_view extension() const = 0;
+                   virtual Result<std::string> format(const PageResult&) = 0; };
+// every interface also has: virtual std::string_view name() const = 0;
 }
 ```
 
@@ -244,6 +244,8 @@ GPU determinism note: kernels that use `atomicAdd` on floats or reduction order 
 | 16 | 2026-11-02 | M3 recognizer = PP-OCRv5 English rec model via ONNX Runtime ≥1.27 `gpu_cuda13`; line-level CTC, so char segmentation leaves the functional path | train our own CRNN; docTR word-level models; Tesseract | Pretrained, small, line-level, permissive license, ONNX available; ORT 1.27 ships CUDA 13 builds. Training a model is out of scope for "make it functional". |
 | 17 | 2026-11-02 | Ground truth from synthetic rendering (Pillow, seeded) + small real-scan subsets (UNLV/ISRI) | real datasets only | Synthetic gives exact GT, deterministic tests and no licensing questions; real scans keep the numbers honest. |
 | 18 | 2026-11-02 | One branch + one PR per backlog task; user merges; branches deleted after merge; `CLAUDE.md`/`.claude/` gitignored; no AI co-author trailers | commit straight to `main` | User direction; PRs give a reviewable unit per task and a clean history (§13). |
+
+| 19 | 2026-11-02 | Interface details (refines #15): detectors return geometry-only `LineResult`s (no separate `LineRegion` type); deskew is its own `Deskewer` interface (estimate once, apply to binary and gray); stages write page metadata through `StageContext::page`; recognizers emit CTC *probabilities* (`CtcProbs`); `Params` stores text and parses on read | `LineRegion` type; deskew as an `ImageStage`; side-output structs per stage; typed `std::variant` params | Fewer types to keep in sync; deskew genuinely needs two outputs from one estimate; a page sink keeps stage signatures uniform; text params match their CLI/TOML origin and give one uniform error for bad values. |
 
 *(Append new rows; never delete — supersede with a new row referencing the old.)*
 
