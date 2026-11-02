@@ -1,5 +1,8 @@
 #include "cudaocr/components/ctc_greedy_decoder.hpp"
 #include "cudaocr/components/hough_deskewer.hpp"
+#ifdef CUDAOCR_WITH_ORT
+#include "cudaocr/components/onnx_line_recognizer.hpp"
+#endif
 #include "cudaocr/components/preprocess.hpp"
 #include "cudaocr/components/projection_detector.hpp"
 #include "cudaocr/registry.hpp"
@@ -32,6 +35,9 @@ ComponentRegistry ComponentRegistry::withBuiltins() {
     (void)r.add<Deskewer>("hough", factoryOf<HoughDeskewer, Deskewer>());
     (void)r.add<TextDetector>("projection", factoryOf<ProjectionDetector, TextDetector>());
     (void)r.add<Decoder>("ctc-greedy", factoryOf<CtcGreedyDecoder, Decoder>());
+#ifdef CUDAOCR_WITH_ORT
+    (void)r.add<LineRecognizer>("onnx", factoryOf<OnnxLineRecognizer, LineRecognizer>());
+#endif
     return r;
 }
 
