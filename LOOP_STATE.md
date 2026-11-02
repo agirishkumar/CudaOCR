@@ -1,6 +1,6 @@
 # LOOP_STATE — machine state for /engineer-step iterations
 
-Active milestone: W (next unchecked task: W.2 branch-aware verify gate), then MOD, then M3
+Active milestone: MOD (next unchecked task: MOD.1 result types), then M3
 
 CURRENT: (none)
 branch: (none)
@@ -13,10 +13,11 @@ lastFailure: (none)
 - M1.1–M1.8, 2026-06-11, "M1: preprocessing kernels (box/median/gauss/adaptive/otsu/equalize/invert) + bench"
 - M2.1–M2.4, 2026-06-11, "M2: hough deskew (baseline voting, bounds regression), GPU rotate, line/word segmentation (char boxes via column gaps; CCL not done)"
 - docs, 2026-11-02, "docs: re-audit status, refine roadmap (W, MOD, M3–M6), branch-per-task workflow" (committed directly to main, pre-workflow)
-- W.1, 2026-11-02, "build: set CUDA arch default before project() (W.1)"
+- W.1, 2026-11-02, "build: set CUDA arch default before project() (W.1)" — PR #1 merged
+- W.2, 2026-11-02, "verify: check everything the branch changes, not just the working tree (W.2)"
 
 ## AWAITING-MERGE
-- PR #1 https://github.com/agirishkumar/CudaOCR/pull/1 (task/W.1-cuda-arch)
+(none)
 
 ## BLOCKED
 (none)
