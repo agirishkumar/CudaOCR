@@ -28,7 +28,7 @@ lastFailure: (none)
 - M3.6, 2026-11-02, "stages: GPU line crop/resize/normalize for the recognizer (M3.6)"
 
 ## AWAITING-MERGE
-(none)
+- PR #13 https://github.com/agirishkumar/CudaOCR/pull/13 (task/M3.6-line-prep)
 
 ## BLOCKED
 (none)
