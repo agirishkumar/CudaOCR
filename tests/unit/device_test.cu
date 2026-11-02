@@ -2,11 +2,25 @@
 
 #include "cudaocr/core/device_buffer.cuh"
 #include "cudaocr/core/device_image.cuh"
+#include "cudaocr/core/device_info.hpp"
 #include "oracles/oracles.hpp"
 #include "test_util.hpp"
 
 namespace cudaocr {
 namespace {
+
+// Regression (product.md §4.3 #1): CMAKE_CUDA_ARCHITECTURES was set after project(),
+// so the build silently targeted sm_75 and every kernel depended on PTX JIT, which
+// the driver refuses once the toolkit is newer than it. Require native SASS for
+// the device and no older PTX.
+TEST(CudaArch, CudaArchMatchesDevice) {
+    auto info = queryKernelArch();
+    ASSERT_TRUE(info.ok()) << info.status().message;
+    EXPECT_EQ(info.value().binaryVersion, info.value().deviceArch);
+    if (info.value().ptxVersion != 0)
+        EXPECT_EQ(info.value().ptxVersion, info.value().deviceArch)
+            << "kernels built for an older virtual arch; set CMAKE_CUDA_ARCHITECTURES";
+}
 
 TEST(DeviceBuffer, RoundTrip) {
     auto buf = DeviceBuffer<int>::create(1024);
