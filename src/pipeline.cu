@@ -63,7 +63,7 @@ struct Pipeline::Impl {
     std::unique_ptr<Deskewer> deskewer;  // null = skip
     std::unique_ptr<TextDetector> detector;
     // Device buffers reused across runs (DeviceImage::ensure).
-    DeviceImage input, a, b, bin, straight;
+    DeviceImage input, a, b, bin, straight, grayStraight;
 };
 
 Pipeline::Pipeline(std::unique_ptr<Impl> impl) : impl_(std::move(impl)) {}
@@ -130,19 +130,28 @@ Result<PageResult> Pipeline::run(const HostImage& input, StageImages* keep) {
         if (!s.ok()) return s;
     }
 
+    // The angle is estimated on the binary page and applied to both the binary
+    // (for detection) and the gray page (for recognition), so line boxes found
+    // on one are valid crops on the other. Polarity already ran, so the fill is
+    // paper-white for both.
     const DeviceImage* binary = &m.bin;
+    const DeviceImage* gray = cur;
     if (m.deskewer) {
         s = timer.timed(page, m.deskewer->name(), [&]() -> Status {
             auto angle = m.deskewer->estimate(m.bin, ctx);
             if (!angle.ok()) return angle.status();
             page.skewDeg = angle.value();
-            return m.deskewer->apply(-angle.value(), m.bin, m.straight, 255, ctx);
+            Status st = m.deskewer->apply(-angle.value(), m.bin, m.straight, 255, ctx);
+            if (!st.ok()) return st;
+            return m.deskewer->apply(-angle.value(), *cur, m.grayStraight, 255, ctx);
         });
         if (!s.ok()) return s;
         binary = &m.straight;
+        gray = &m.grayStraight;
     }
     if (keep) {
         s = binary->download(keep->deskewed, m.stream.get());
+        if (s.ok()) s = gray->download(keep->deskewedGray, m.stream.get());
         if (!s.ok()) return s;
     }
 

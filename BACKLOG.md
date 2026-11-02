@@ -68,7 +68,7 @@ Active milestone: **M3** (MOD complete)
   *Done:* 10 fixtures (900 KB) + `--check`/`--set large`; exposed and fixed descender-sliver over-segmentation in `detectLines` (all variants now exact; noise needs Otsu → M3.11).
 - [x] **M3.2 CER/WER evaluation module + tool.** `src/eval/` Levenshtein-based CER/WER (host C++), `cudaocr-eval <pred_dir> <gt_dir>` → per-file + aggregate table (markdown).
   *Accept:* unit tests on known pairs (identical → 0, one substitution, insert/delete, empty strings, UTF-8 multi-byte).
-- [ ] **M3.3 Gray deskew path.** Pipeline keeps the deskewed gray image (same angle as binary) for recognition; `--dump-stages` writes it.
+- [x] **M3.3 Gray deskew path.** Pipeline keeps the deskewed gray image (same angle as binary) for recognition; `--dump-stages` writes it.
   *Accept:* test — rotating gray and binary with the detected angle yields aligned images (binary of rotated gray ≈ rotated binary within documented tolerance).
 - [ ] **M3.4 ONNX Runtime dependency.** CMake option `CUDAOCR_WITH_ORT` (default ON): download prebuilt `onnxruntime-linux-x64-gpu_cuda13-<ver>.tgz` (≥1.27, SHA-256 pinned) via FetchContent; imported target; core lib still builds with it OFF.
   *Accept:* smoke test runs a tiny committed ONNX model (e.g. Add/Identity) on CPU EP and CUDA EP and gets the expected output; `-DCUDAOCR_WITH_ORT=OFF` build + ctest green.

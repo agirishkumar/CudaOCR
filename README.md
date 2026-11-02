@@ -50,7 +50,7 @@ Score OCR output against ground truth (CER/WER over Unicode code points, whitesp
 ./build/cudaocr-eval <pred_dir> <gt_dir> [--max-cer 0.05]   # <name>.txt vs <name>.gt.txt
 ```
 
-`--dump-stages` writes the intermediate images plus an overlay with detected
+`--dump-stages` writes the intermediate images (gray, binary, deskewed binary, deskewed gray) plus an overlay with detected
 lines (blue), words (red), and characters (green). See `./build/cudaocr --help`
 for thresholding/deskew options.
 
