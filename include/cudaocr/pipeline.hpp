@@ -14,20 +14,29 @@
 
 namespace cudaocr {
 
-// Defaults reproduce the original hard-wired pipeline: median 3x3, polarity
-// normalization, adaptive threshold (31, 10), Hough deskew (±15°, 0.25° step),
-// projection-profile detection (min line height 3).
+// Flow: input -> toGray -> preprocess -> G (the gray page the recognizer reads)
+//       G -> binarizePrep -> binarizer -> deskew -> detector
+// binarizePrep stages feed only the binarizer and never touch G. Measured in
+// M3.11: moving the median there (recognizer reads unfiltered gray) made
+// sherlock.png 0.89% -> 2.98% CER, so by default the median stays shared.
+// Defaults: median 3x3 + polarity normalization (shared), no binarizePrep,
+// adaptive threshold (31, 40; decision #25), Hough deskew (±15°, 0.25° step),
+// projection-profile detection (min line height 3). Recognition is opt-in
+// (`recognizer`, e.g. {"onnx", ...}): without it lines carry geometry only.
 struct PipelineConfig {
     ComponentSpec toGray{"grayscale", {}};  // runs only for 3-channel input
     std::vector<ComponentSpec> preprocess{{"median", Params().set("k", 3)}, {"polarity", {}}};
+    std::vector<ComponentSpec> binarizePrep;
     ComponentSpec binarizer{"adaptive", {}};
     std::optional<ComponentSpec> deskewer = ComponentSpec{"hough", {}};  // nullopt = skip
     ComponentSpec detector{"projection", {}};
+    std::optional<ComponentSpec> recognizer;  // nullopt = detection only
+    ComponentSpec decoder{"ctc-greedy", {}};  // used only with a recognizer
 };
 
 // Intermediate images for --dump-stages / debugging.
 struct StageImages {
-    HostImage gray;          // after preprocessing (polarity-normalized)
+    HostImage gray;          // G: after preprocess (not binarizePrep), polarity-normalized
     HostImage binary;        // after binarization
     HostImage deskewed;      // binary after deskew (== binary when deskew is off)
     HostImage deskewedGray;  // gray after deskew, same angle; what the recognizer reads

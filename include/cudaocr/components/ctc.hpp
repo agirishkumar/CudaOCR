@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "cudaocr/core/status.hpp"
+
 namespace cudaocr {
 
 // Per-timestep class probabilities for one line, row-major [T x C]. Recognizers
@@ -32,5 +34,9 @@ struct Charset {
     std::vector<std::string> symbols;
     int blank = 0;
 };
+
+// PaddleOCR-style CTC charset: blank at 0, then one symbol per dictionary line
+// (CRLF tolerated), then " " appended last (use_space_char). IoError if unreadable.
+Result<Charset> loadCtcCharset(const std::string& dictPath);
 
 }  // namespace cudaocr

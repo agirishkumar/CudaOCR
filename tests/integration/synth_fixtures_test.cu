@@ -60,21 +60,17 @@ TEST(SynthFixtures, ManifestMatchesFilesAndGroundTruth) {
     }
 }
 
-// Every variant is segmented into exactly the ground-truth line count. The noisy
-// page uses Otsu: with the default adaptive threshold it yields 1 line (known
-// weakness, BACKLOG M3.11 — switch it to defaults once that lands).
+// Every variant, including the noisy page (fixed by the M3.11 default C = 40;
+// it yielded 1/6 lines with C = 10), is segmented into the ground-truth line count.
 TEST(SynthFixtures, AllVariantsHaveExpectedLineCount) {
     auto defaults = Pipeline::create(PipelineConfig{});
-    PipelineConfig otsuCfg;
-    otsuCfg.binarizer = {"otsu", {}};
-    auto otsu = Pipeline::create(otsuCfg);
-    ASSERT_TRUE(defaults.ok() && otsu.ok());
+    ASSERT_TRUE(defaults.ok());
     int checked = 0;
     for (const auto& f : manifest()) {
         SCOPED_TRACE(f.name);
         auto img = loadImage((fs::path(CUDAOCR_SYNTH_DIR) / (f.name + ".png")).string());
         ASSERT_TRUE(img.ok()) << img.status().message;
-        Pipeline& p = f.variant == "noise" ? otsu.value() : defaults.value();
+        Pipeline& p = defaults.value();
         auto r = p.run(img.value());
         ASSERT_TRUE(r.ok()) << r.status().message;
         EXPECT_EQ(static_cast<int>(r.value().lines.size()), f.lines);
