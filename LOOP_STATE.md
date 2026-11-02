@@ -26,7 +26,7 @@ lastFailure: (none)
 - M3.4, 2026-11-02, "build: add pinned ONNX Runtime 1.31.1 (CUDA 13) dependency (M3.4)"
 
 ## AWAITING-MERGE
-(none)
+- PR #11 https://github.com/agirishkumar/CudaOCR/pull/11 (task/M3.4-onnxruntime)
 
 ## BLOCKED
 (none)
