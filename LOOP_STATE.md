@@ -27,7 +27,7 @@ lastFailure: (none)
 - M3.5, 2026-11-02, "models: pinned PP-OCRv5 English recognizer fetch + model card (M3.5)"
 
 ## AWAITING-MERGE
-(none)
+- PR #12 https://github.com/agirishkumar/CudaOCR/pull/12 (task/M3.5-model-fetch)
 
 ## BLOCKED
 (none)
