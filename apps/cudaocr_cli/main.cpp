@@ -17,6 +17,7 @@ void usage() {
         "usage: cudaocr <input-image> [options]\n"
         "Prints the recognized text to stdout (diagnostics go to stderr).\n"
         "  -o <file>             write output to a file (.json -> JSON, else text)\n"
+        "                        JSON schema: docs/output-formats.md\n"
         "  --format <txt|json>   output format (default: from -o's extension, else txt)\n"
         "  --no-recognize        detection only (no model needed); output has boxes, no text\n"
         "  --ep <cuda|cpu>       recognizer execution provider (default cuda)\n"
@@ -59,80 +60,6 @@ int glyphCount(const PageResult& page) {
     for (const auto& l : page.lines)
         for (const auto& w : l.words) n += static_cast<int>(w.glyphs.size());
     return n;
-}
-
-std::string jsonString(const std::string& s) {
-    std::string out = "\"";
-    for (unsigned char c : s) {
-        switch (c) {
-            case '"':
-                out += "\\\"";
-                break;
-            case '\\':
-                out += "\\\\";
-                break;
-            case '\n':
-                out += "\\n";
-                break;
-            case '\t':
-                out += "\\t";
-                break;
-            case '\r':
-                out += "\\r";
-                break;
-            default:
-                if (c < 0x20) {
-                    char buf[8];
-                    std::snprintf(buf, sizeof buf, "\\u%04x", c);
-                    out += buf;
-                } else {
-                    out += static_cast<char>(c);  // UTF-8 passes through
-                }
-        }
-    }
-    return out + "\"";
-}
-
-std::string boxJson(const BBox& b) {
-    return "\"x0\": " + std::to_string(b.x0) + ", \"y0\": " + std::to_string(b.y0) +
-           ", \"x1\": " + std::to_string(b.x1) + ", \"y1\": " + std::to_string(b.y1);
-}
-
-std::string toJson(const PageResult& res) {
-    std::string j = "{\n";
-    j += "  \"skewAngleDeg\": " + std::to_string(res.skewDeg) + ",\n";
-    j += "  \"wasInverted\": " + std::string(res.inverted ? "true" : "false") + ",\n";
-    for (const auto& [key, value] : res.metrics)
-        j += "  \"" + key + "\": " + std::to_string(value) + ",\n";
-    j += "  \"lineCount\": " + std::to_string(res.lines.size()) + ",\n";
-    j += "  \"wordCount\": " + std::to_string(res.wordCount()) + ",\n";
-    j += "  \"charCount\": " + std::to_string(glyphCount(res)) + ",\n";
-    std::string text;
-    for (const auto& l : res.lines)
-        if (!l.text.empty()) text += l.text + "\n";
-    j += "  \"text\": " + jsonString(text) + ",\n";
-    j += "  \"lines\": [\n";
-    for (size_t i = 0; i < res.lines.size(); ++i) {
-        const auto& line = res.lines[i];
-        j += "    {" + boxJson(line.box) + ", \"text\": " + jsonString(line.text) +
-             ", \"conf\": " + std::to_string(line.conf) + ", \"words\": [";
-        for (size_t wi = 0; wi < line.words.size(); ++wi) {
-            const auto& w = line.words[wi];
-            j += "\n      {" + boxJson(w.box) + ", \"chars\": " + std::to_string(w.glyphs.size()) +
-                 "}";
-            if (wi + 1 < line.words.size()) j += ",";
-        }
-        j += "]}";
-        if (i + 1 < res.lines.size()) j += ",";
-        j += "\n";
-    }
-    j += "  ],\n  \"timingsMs\": {";
-    for (size_t i = 0; i < res.timings.size(); ++i) {
-        j += "\"" + res.timings[i].name + "\": " + std::to_string(res.timings[i].ms);
-        if (i + 1 < res.timings.size()) j += ", ";
-    }
-    j += "}\n}\n";
-    return j;
 }
 
 // CLI knobs, kept as text so the components' Params validation reports bad
@@ -310,18 +237,13 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "%-20s %10.3f\n", "TOTAL", total);
     }
 
-    std::string output;
-    if (format == "json") {
-        output = toJson(r);
-    } else {
-        auto fmt = ComponentRegistry::withBuiltins().make<Formatter>({"txt", {}});
-        auto text = fmt.ok() ? fmt.value()->format(r) : Result<std::string>(fmt.status());
-        if (!text.ok()) {
-            std::fprintf(stderr, "format error: %s\n", text.status().message.c_str());
-            return 2;
-        }
-        output = text.take();
+    auto fmt = ComponentRegistry::withBuiltins().make<Formatter>({format, {}});
+    auto formatted = fmt.ok() ? fmt.value()->format(r) : Result<std::string>(fmt.status());
+    if (!formatted.ok()) {
+        std::fprintf(stderr, "format error: %s\n", formatted.status().message.c_str());
+        return 2;
     }
+    const std::string output = formatted.take();
     if (outPath.empty()) {
         std::fwrite(output.data(), 1, output.size(), stdout);
     } else {

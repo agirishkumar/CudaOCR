@@ -176,6 +176,10 @@ Result<std::vector<CtcProbs>> OnnxLineRecognizer::recognize(const DeviceImage& g
             for (size_t k = 0; k < n; ++k) {
                 const int64_t own = std::min<int64_t>(T, b.crops[k].outW / 8);
                 CtcProbs p(static_cast<int>(own), static_cast<int>(C));
+                // One timestep = 8 resized columns = 8 * w / outW crop columns.
+                const LineCrop& crop = b.crops[k];
+                p.x0 = static_cast<float>(crop.x0);
+                p.stepWidth = 8.0f * static_cast<float>(crop.w) / static_cast<float>(crop.outW);
                 const float* src = probs + static_cast<int64_t>(k) * T * C;
                 std::copy(src, src + own * C, p.data().begin());
                 out[order[start + k]] = std::move(p);

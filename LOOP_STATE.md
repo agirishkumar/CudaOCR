@@ -1,9 +1,9 @@
 # LOOP_STATE — machine state for /engineer-step iterations
 
-Active milestone: M4 (M3 complete; M3.7–M3.11 shipped as one PR on user request)
+Active milestone: M4 — batch M4.1–M4.4 on one branch (user request: single PR)
 
-CURRENT: (none)
-branch: task/M3.7-M3.11-functional-ocr
+CURRENT: M4.2
+branch: task/M4.1-M4.4-usable-product
 pr: (none)
 attempts: 0
 lastFailure: (none)
@@ -30,10 +30,11 @@ lastFailure: (none)
 - M3.8, 2026-11-02, "components: ONNX Runtime line recognizer (M3.8)"
 - M3.9, 2026-11-02, "pipeline: end-to-end text, txt formatter, CLI text output (M3.9)"
 - M3.10, 2026-11-02, "benchmarks: accuracy baseline, real-scan ground truth, ratchets; fix ORT exit crash (M3.10)"
-- M3.11, 2026-11-02, "pipeline: adaptive C 40 default, binarizePrep slot, new ratchets (M3.11)"
+- M3.11, 2026-11-02, "pipeline: adaptive C 40 default, binarizePrep slot, new ratchets (M3.11)" — PR #14 merged
+- M4.1, 2026-11-02, "output: JSON schema cudaocr.page/1 with recognized word boxes (M4.1)"
 
 ## AWAITING-MERGE
-- PR #14 https://github.com/agirishkumar/CudaOCR/pull/14 (task/M3.7-M3.11-functional-ocr)
+(none)
 
 ## BLOCKED
 (none)
