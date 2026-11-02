@@ -52,8 +52,37 @@ target_link_libraries(cudaocr-eval PRIVATE cudaocr_lib)
 include(GNUInstallDirs)
 install(TARGETS cudaocr cudaocr-eval RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-# ---- tests ----
+# ---- ONNX Runtime (recognizer backend, M3; optional) ----
+# Prebuilt CUDA 13 release, SHA-256 pinned. Set CUDAOCR_ORT_ROOT to an already
+# extracted tree (include/, lib/) to skip the 233 MB download, e.g. for extra
+# build directories. Only src/components/ and tests may include ORT headers.
+option(CUDAOCR_WITH_ORT "Build ONNX Runtime-backed components" ON)
+set(CUDAOCR_ORT_VERSION 1.31.1)
+set(CUDAOCR_ORT_ROOT "" CACHE PATH "Existing ONNX Runtime tree (skips download)")
 include(FetchContent)
+if(CUDAOCR_WITH_ORT)
+  if(NOT CUDAOCR_ORT_ROOT)
+    FetchContent_Declare(
+      onnxruntime
+      URL https://github.com/microsoft/onnxruntime/releases/download/v${CUDAOCR_ORT_VERSION}/onnxruntime-linux-x64-gpu_cuda13-${CUDAOCR_ORT_VERSION}.tgz
+      URL_HASH SHA256=b2146862e691f7e338f5aff9c7a9a5567c2ca57cf01442a1adb3a13bf62d9095
+      DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+      SOURCE_SUBDIR no-cmake  # prebuilt binaries: populate only, no add_subdirectory
+    )
+    FetchContent_MakeAvailable(onnxruntime)
+    set(CUDAOCR_ORT_ROOT ${onnxruntime_SOURCE_DIR} CACHE PATH "" FORCE)
+  endif()
+  if(NOT EXISTS ${CUDAOCR_ORT_ROOT}/include/onnxruntime_cxx_api.h)
+    message(FATAL_ERROR "CUDAOCR_ORT_ROOT=${CUDAOCR_ORT_ROOT} has no include/onnxruntime_cxx_api.h")
+  endif()
+  add_library(onnxruntime::onnxruntime SHARED IMPORTED)
+  set_target_properties(onnxruntime::onnxruntime PROPERTIES
+    IMPORTED_LOCATION ${CUDAOCR_ORT_ROOT}/lib/libonnxruntime.so
+    INTERFACE_INCLUDE_DIRECTORIES ${CUDAOCR_ORT_ROOT}/include)
+  message(STATUS "ONNX Runtime: ${CUDAOCR_ORT_ROOT}")
+endif()
+
+# ---- tests ----
 FetchContent_Declare(
   googletest
   URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.tar.gz
@@ -88,10 +117,15 @@ add_executable(unit_tests
   tests/integration/gray_deskew_test.cu
 )
 target_link_libraries(unit_tests PRIVATE cudaocr_lib gtest gtest_main)
+if(CUDAOCR_WITH_ORT)
+  target_sources(unit_tests PRIVATE tests/unit/ort_smoke_test.cpp)
+  target_link_libraries(unit_tests PRIVATE onnxruntime::onnxruntime)
+endif()
 target_include_directories(unit_tests PRIVATE tests)
 target_compile_definitions(unit_tests PRIVATE
   CUDAOCR_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources"
-  CUDAOCR_SYNTH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/synth")
+  CUDAOCR_SYNTH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/synth"
+  CUDAOCR_ONNX_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/onnx")
 set_target_properties(unit_tests PROPERTIES
   CUDA_SEPARABLE_COMPILATION ON
   RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
