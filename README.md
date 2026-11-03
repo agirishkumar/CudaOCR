@@ -6,6 +6,8 @@ against a CPU reference implementation by the test suite — and text recognitio
 PP-OCRv5 English model through ONNX Runtime on the GPU. One command turns scans, images or
 scanned PDFs into text, JSON or hOCR.
 
+Project page with a visual walkthrough: **<https://agirishkumar.github.io/CudaOCR/>**.
+
 ```bash
 ./build/cudaocr scan.pdf -o out/            # out/scan-p001.txt, out/scan-p002.txt, ...
 ```
@@ -50,7 +52,7 @@ image / PDF page ─► grayscale ─► median 3×3 ─► polarity ─┬─�
 release, then
 
 ```bash
-sudo apt install ./cudaocr_0.1.0-1~ubuntu24.04_amd64.deb
+sudo apt install ./cudaocr_0.1.0-1.ubuntu24.04_amd64.deb
 ```
 
 It bundles ONNX Runtime and the PP-OCRv5 model and runs on any NVIDIA GPU from sm_75
@@ -184,6 +186,7 @@ CER ratchets — see [docs/architecture.md](docs/architecture.md) §8.
 | `apps/` | `cudaocr` CLI, `cudaocr-eval` |
 | `tests/` | unit/integration tests, CPU oracles, fixtures (synthetic pages, real-scan ground truth, PDF) |
 | `scripts/` | `verify.sh`, `fetch_models.sh`, `fetch_unlv.sh`, `gen_fixtures.py`, `accuracy_report.sh`, `onnx_info.py` |
+| `site/` | the project page (static HTML, deployed by `.github/workflows/pages.yml`) |
 | `docs/` | [product](docs/product.md), [architecture](docs/architecture.md), [decisions](docs/decisions.md), [backlog](docs/backlog.md), [config](docs/config.md), [output formats](docs/output-formats.md) |
 | `resources/`, `models/` | sample pages with [sources and licences](resources/README.md); [model card](models/README.md) |
 
