@@ -1,0 +1,12 @@
+build*/
+data/
+dist/
+output/
+models/*.onnx
+models/dict.txt
+.git/
+.cache/
+*.log
+CLAUDE.md
+.claude/
+LOOP_STATE.md
