@@ -9,7 +9,7 @@
 namespace cudaocr {
 namespace {
 
-// Regression (product.md §4.3 #1): CMAKE_CUDA_ARCHITECTURES was set after project(),
+// Regression (docs/product.md §6): CMAKE_CUDA_ARCHITECTURES was set after project(),
 // so the build silently targeted sm_75 and every kernel depended on PTX JIT, which
 // the driver refuses once the toolkit is newer than it. Require native SASS for
 // the device and no older PTX.

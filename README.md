@@ -13,8 +13,9 @@ scanned PDFs into text, JSON or hOCR.
 **Scope:** printed, mostly single-column documents (scans, screenshots, PDFs of scans).
 Not handwriting, scene text, or layout understanding (tables, forms). Goal: a functional,
 modular, well-tested OCR whose parts can be swapped or optimized — not a state-of-the-art
-competitor. Details: [product.md](product.md) · design: [architecture.md](architecture.md) ·
-open work: [BACKLOG.md](BACKLOG.md).
+competitor. Details: [docs/product.md](docs/product.md) · design:
+[docs/architecture.md](docs/architecture.md) · decisions: [docs/decisions.md](docs/decisions.md) ·
+open work: [docs/backlog.md](docs/backlog.md).
 
 ## Features
 
@@ -109,7 +110,7 @@ Accuracy from `scripts/accuracy_report.sh --large` with default settings
 |---|---:|---:|---:|
 | Synthetic pages (clean, skewed, noisy, inverted; generated) | 50 | 0.21 % | 1.00 % |
 | Clean typeset book page (`resources/sherlock.png`) | 1 | 0.94 % | 4.23 % |
-| Real scans in `resources/` (incl. stained and speckled) | 4 | 5.01 % | 9.77 % |
+| Real scans in `resources/` (book page, coffee-stained, crumpled) | 3 | 4.75 % | 9.03 % |
 | UNLV/ISRI business letters + DOE reports, 300 dpi — zoned\* | 40 | 6.84 % | 15.10 % |
 | UNLV/ISRI, same pages — full page | 40 | 19.64 % | 29.94 % |
 
@@ -120,7 +121,7 @@ work. UNLV data: `scripts/fetch_unlv.sh` (43 MB, not redistributable).
 Speed (RTX 3060 Laptop, model warm, dense 33-line page `sherlock.png`): GPU preprocessing,
 deskew and line detection **≈ 3 ms**; recognition **≈ 370 ms** (the bottleneck; first page
 per process adds ≈ 0.5 s of model/cuDNN start-up). Custom kernels vs NVIDIA NPP on a
-2500×3500 image ([benchmarks/RESULTS.md](benchmarks/RESULTS.md)):
+2500×3500 image (`./build/bench`, CUDA 13.4):
 
 | Kernel | Custom | NPP | |
 |---|---:|---:|---|
@@ -133,8 +134,8 @@ per process adds ≈ 0.5 s of model/cuDNN start-up). Custom kernels vs NVIDIA NP
 
 - **Multi-column pages, tables, headers and figures:** projection-profile layout reads one
   column top to bottom (UNLV full page 19.6 % vs 6.8 % zoned).
-- **Heavy stains and speckle noise:** coffee-stained scans ≈ 30 % CER; isolated specks can be
-  read as characters.
+- **Heavy stains and speckle noise:** the coffee-stained sample scores ≈ 30 % CER; isolated
+  specks can be read as characters.
 - **Throughput:** ≈ 0.3–0.4 s per dense page, dominated by the recognizer.
 - English/Latin script only (the model's 436-character dictionary).
 
@@ -151,7 +152,7 @@ ctest --test-dir build --output-on-failure      # ~200 tests (model-dependent on
 
 Every GPU kernel lands with a CPU oracle and a comparison test (byte-exact for integer
 kernels), every fixed bug with a named regression test, and accuracy changes are guarded by
-CER ratchets — see [architecture.md](architecture.md) §8.
+CER ratchets — see [docs/architecture.md](docs/architecture.md) §8.
 
 | Path | Contents |
 |---|---|
@@ -159,7 +160,8 @@ CER ratchets — see [architecture.md](architecture.md) §8.
 | `apps/` | `cudaocr` CLI, `cudaocr-eval` |
 | `tests/` | unit/integration tests, CPU oracles, fixtures (synthetic pages, real-scan ground truth, PDF) |
 | `scripts/` | `verify.sh`, `fetch_models.sh`, `fetch_unlv.sh`, `gen_fixtures.py`, `accuracy_report.sh`, `onnx_info.py` |
-| `docs/` | [config](docs/config.md), [output formats](docs/output-formats.md); model card: [models/README.md](models/README.md) |
+| `docs/` | [product](docs/product.md), [architecture](docs/architecture.md), [decisions](docs/decisions.md), [backlog](docs/backlog.md), [config](docs/config.md), [output formats](docs/output-formats.md) |
+| `resources/`, `models/` | sample pages with [sources and licences](resources/README.md); [model card](models/README.md) |
 
 ## License
 

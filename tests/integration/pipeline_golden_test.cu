@@ -6,6 +6,9 @@
 // purpose must regenerate these values and say why in the commit.
 //
 // Intentional changes since generation:
+// - 2026-11-02 repo cleanup: sample.png (personal), sample.jpg (copyrighted poster)
+//   and vigorous-before.png (unknown licence) removed from resources/ with their
+//   rows; sherlock.png rows added, pinned from the then-current pipeline.
 // - M3.1 (rows marked "M3.1"): detectLines merges descender/i-dot slivers
 //   (< 1/3 typical line height, within 1/3 line) into the adjacent line. Each
 //   affected case lost exactly one 4-5 row band sitting 2 rows below a text
@@ -123,8 +126,7 @@ std::vector<Case> cases() {
     eqMedian5.median = 5;
     eqMedian5.blockSize = 15;
     eqMedian5.C = 4;
-    for (const char* f :
-         {"sample.png", "sample.jpg", "noisy_text.png", "noisy_text2.png", "vigorous-before.png"}) {
+    for (const char* f : {"noisy_text.png", "noisy_text2.png", "sherlock.png"}) {
         auto img = loadImage(std::string(CUDAOCR_FIXTURE_DIR) + "/" + f);
         EXPECT_TRUE(img.ok()) << f;
         if (!img.ok()) continue;
@@ -140,21 +142,17 @@ const Golden kGolden[] = {
     {"synthetic_skewed", 3, 9, 34, 2.5000f, false, 0x62f1d2a1789382faull},
     {"synthetic_inverted", 3, 9, 34, 0.0000f, true, 0x54d0666fb9d2b570ull},
     {"synthetic_otsu", 3, 9, 34, 0.0000f, false, 0xcdf55127979f49c9ull},
-    {"sample.png/default", 35, 348, 903, 0.0000f, false, 0x818c786b386c1b80ull},
-    {"sample.png/otsu_nodeskew", 35, 353, 1436, 0.0000f, false, 0x74e571af487cef4bull},
-    {"sample.png/equalize_median5", 35, 355, 525, 0.0000f, false, 0xb642d6f845233c3bull},
-    {"sample.jpg/default", 3, 4, 15, 0.0000f, false, 0x85cf7b74c0addd6aull},
-    {"sample.jpg/otsu_nodeskew", 3, 7, 22, 0.0000f, false, 0x470f6d6e82580eb7ull},  // M3.1
-    {"sample.jpg/equalize_median5", 1, 1, 1, 0.0000f, false, 0xba5396c339cdb695ull},
     {"noisy_text.png/default", 3, 12, 20, 0.0000f, false, 0x4d232622824ae89aull},
     {"noisy_text.png/otsu_nodeskew", 3, 16, 99, 0.0000f, false, 0xf257a9769275e1dcull},  // M3.1
     {"noisy_text.png/equalize_median5", 1, 1, 1, 0.0000f, false, 0x23834f81e5309b7dull},
     {"noisy_text2.png/default", 2, 2, 3, 0.0000f, false, 0x3a903881d09f40f4ull},
     {"noisy_text2.png/otsu_nodeskew", 8, 44, 216, 0.0000f, false, 0xb0cfcf5a211cfa06ull},  // M3.1
     {"noisy_text2.png/equalize_median5", 1, 1, 1, 0.0000f, true, 0xc9c1e938e878a717ull},
-    {"vigorous-before.png/default", 8, 13, 20, 0.7500f, false, 0x242e656882a58573ull},
-    {"vigorous-before.png/otsu_nodeskew", 5, 7, 12, 0.0000f, false, 0x30124c3a28fde2a0ull},
-    {"vigorous-before.png/equalize_median5", 3, 3, 12, 0.7500f, false, 0x81adb24bc0dc03ffull},
+    // Added 2026-11-02 (repo cleanup): pinned from the current pipeline, not from
+    // the legacy one (removed images: sample.png, sample.jpg, vigorous-before.png).
+    {"sherlock.png/default", 32, 713, 2338, 0.0000f, false, 0x490f2cb01e945c83ull},
+    {"sherlock.png/otsu_nodeskew", 31, 722, 4176, 0.0000f, false, 0x5384271af35f9657ull},
+    {"sherlock.png/equalize_median5", 31, 667, 745, 0.0000f, false, 0xaf056b376dbdd9ebull},
 };
 
 TEST(PipelineGolden, MatchesPinnedLegacyOutput) {

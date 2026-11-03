@@ -1,7 +1,7 @@
 # CudaOCR — Product Definition
 
-> **What** we build and **why**. How it is built: [architecture.md](architecture.md). Open
-> work: [BACKLOG.md](BACKLOG.md). Status as of 2026-11-02 (milestones M0–M4 complete).
+> **What** we build and **why**. How it is built: [architecture.md](architecture.md) (choices:
+> [decisions.md](decisions.md)). Open work: [backlog.md](backlog.md). Status as of 2026-11-02 (milestones M0–M4 complete).
 
 ## 1. Vision
 
@@ -53,8 +53,8 @@ dependency-light, well-tested GPU pipeline.
 | Line preparation (custom CUDA) | crop each line (+10 % padding), resize to 48 px, normalize to the model's input, batch (width-capped) | `stages/line_prep` |
 | Recognition | PP-OCRv5 English (`en_PP-OCRv5_mobile_rec`) via ONNX Runtime 1.31.1, CUDA or CPU execution provider; lines batched by width | `components/onnx_line_recognizer` |
 | Decoding | CTC greedy with confidences; word boxes from CTC timesteps | `components/ctc_greedy_decoder`, `components/words` |
-| Output | txt, JSON (schema `cudaocr.page/1`), hOCR 1.2 | `components/*_formatter`, [docs/output-formats.md](docs/output-formats.md) |
-| Configuration | TOML config mirroring the component model; `--print-config` round-trips; flags override | `config`, [docs/config.md](docs/config.md) |
+| Output | txt, JSON (schema `cudaocr.page/1`), hOCR 1.2 | `components/*_formatter`, [output-formats.md](output-formats.md) |
+| Configuration | TOML config mirroring the component model; `--print-config` round-trips; flags override | `config`, [config.md](config.md) |
 | Evaluation | `cudaocr-eval` (CER/WER, UTF-8, wildcard), `accuracy_report.sh`, synthetic fixture generator, UNLV/ISRI fetcher, accuracy ratchets in ctest | `eval/`, `scripts/` |
 | Diagnostics | `-v` summaries, `--benchmark` per-stage GPU timings, `--dump-stages` images + overlay | CLI |
 | Install | `cmake --install` produces a self-contained prefix (binaries, ONNX Runtime libraries, model) | `CMakeLists.txt` |
@@ -65,7 +65,7 @@ dependency-light, well-tested GPU pipeline.
 |---|---|---|
 | Kernel correctness | every custom kernel matches its CPU oracle (byte-exact integer ops; documented float tolerance) | ✅ all kernels; memcheck clean |
 | Accuracy, synthetic clean pages | CER ≤ 5 % | ✅ 0.21 % (50 pages) |
-| Accuracy, real scans | CER ≤ 10 % | ✅ 5.01 % on `resources/` (4 scans), 6.84 % on UNLV zoned (40 pages); ❌ 19.64 % UNLV full page (layout) |
+| Accuracy, real scans | CER ≤ 10 % | ✅ 4.75 % on `resources/` (3 scans), 6.84 % on UNLV zoned (40 pages); ❌ 19.64 % UNLV full page (layout) |
 | End-to-end latency | ≤ 150 ms per page | ❌ ≈ 370 ms warm on a dense 33-line page (recognizer ≈ 99 %; GPU preprocessing + layout ≈ 3 ms) |
 | Kernel speed | each custom kernel within 2× of NPP | ✅ grayscale 1.2×, box mean 8× faster; ❌ Gaussian 2.6×, median 5×5 27× (M6) |
 | GPU memory | never OOM on a 6 GB card | ✅ line width capped (degenerate lines once requested 3.8 GB) |
@@ -73,15 +73,16 @@ dependency-light, well-tested GPU pipeline.
 | Portability | sm_75+ with CUDA 13.x; builds without ONNX Runtime or poppler | ✅ |
 | Modularity | a new implementation = one class + one registry line; no `Pipeline` edits | ✅ |
 
-Numbers: [benchmarks/ACCURACY.md](benchmarks/ACCURACY.md), [benchmarks/RESULTS.md](benchmarks/RESULTS.md).
+Numbers: [benchmarks/ACCURACY.md](../benchmarks/ACCURACY.md) (generated) and the
+[README results](../README.md#results).
 
 ## 6. Known limitations
 
 1. **Layout assumes one column.** Projection profiles read top to bottom; multi-column pages,
    tables, headers/footers and figures interleave (UNLV full page 19.6 % vs zoned 6.8 %).
    → M6.3 (DBNet detector), M6.9.
-2. **Stains and speckles.** Coffee-stained `noisy_text.png` ≈ 30 % CER; isolated specks on
-   `vigorous-before.png` are read as characters. → M6.8.
+2. **Stains and speckles.** Coffee-stained `noisy_text.png` ≈ 30 % CER; isolated specks can be
+   read as characters. → M6.8.
 3. **Recognizer throughput** ≈ 0.3–0.4 s per dense page. → M6.7.
 4. **Character boxes** (detection-only JSON `glyphs`) come from column gaps and merge touching
    glyphs; recognized words don't need them. → M6.4 (connected components).
@@ -117,11 +118,11 @@ Bugs fixed so far each have a named regression test:
 | Source | What | Use |
 |---|---|---|
 | Synthetic (`scripts/gen_fixtures.py`) | seeded renders of known text with DejaVu/Liberation fonts: clean, skewed, noisy, inverted; 10 committed, 50 on demand | unit/integration tests, CER ratchets |
-| `resources/` + `tests/fixtures/real/` | 4 hand-transcribed real images (book page, stained, crumpled, speckled) | real-scan CER ratchet |
+| `resources/` + `tests/fixtures/real/` | 3 hand-transcribed real pages (public-domain book page; two CC BY 4.0 NoisyOffice-style scans, stained and crumpled) — sources in `resources/README.md` | real-scan CER ratchet |
 | UNLV/ISRI (`scripts/fetch_unlv.sh`) | 40-page seeded sample of business letters + DOE reports, 300 dpi bitonal, with zone files | zoned and full-page CER; © UNLV, never committed |
 | `tests/fixtures/pdf/` | 2-page JPEG-embedded PDF of two synthetic pages | PDF input tests |
 
 Model: PP-OCRv5 English recognition, ONNX export (Apache-2.0), fetched by
-`scripts/fetch_models.sh`; model card [models/README.md](models/README.md).
+`scripts/fetch_models.sh`; model card [models/README.md](../models/README.md).
 Compute: a single RTX 3060 Laptop (sm_86, 6 GB) covers everything; GitHub-hosted CI has no
 GPU, so `scripts/verify.sh` is the local gate for every PR.

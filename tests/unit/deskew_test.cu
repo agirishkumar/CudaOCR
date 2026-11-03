@@ -42,7 +42,7 @@ TEST(Rotate, ZeroAngleIsIdentity) {
 
 // Regression for the legacy hough kernel's out-of-bounds accumulator write
 // (bounds check was r < 2*rho against an allocation of rho*theta ints; see
-// product.md 4.2). Wide aspect ratio maximizes |rho| relative to the bins.
+// docs/product.md §6). Wide aspect ratio maximizes |rho| relative to the bins.
 TEST(DetectSkew, HoughAccumulatorBoundsRegression) {
     HostImage wide = HostImage::create(2048, 64, 1, 255);
     for (int x = 0; x < wide.width; ++x)
