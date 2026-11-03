@@ -47,6 +47,22 @@ TEST(PlanLineCrops, OffPagePaddingAndMinWidth) {
     EXPECT_EQ(narrow.value()[0].outW, 8);
 }
 
+// Regression (M4.6): thin horizontal rules on UNLV pages were detected as 3-6 px
+// "lines"; resized to height 48 they became ~30,000 px wide, and the
+// recognizer's attention (O(T^2), T = W/8) asked ONNX Runtime for up to 3.8 GB
+// and failed the whole page. maxWidth caps the resized width (squeezing).
+TEST(PlanLineCrops, MaxWidthCapsDegenerateAspectRatios) {
+    LinePrepParams p;                                    // default maxWidth 6144
+    const std::vector<BBox> boxes{{0, 100, 2499, 103}};  // 2500 x 4 rule
+    auto plan = planLineCrops(boxes, 2560, 3300, p);
+    ASSERT_TRUE(plan.ok());
+    EXPECT_EQ(plan.value()[0].outW, 6144);  // round(2500 * 48 / 4) = 30000 -> capped
+    p.maxWidth = 0;                         // 0 = no cap
+    EXPECT_EQ(planLineCrops(boxes, 2560, 3300, p).value()[0].outW, 30000);
+    p.maxWidth = 4;  // below minWidth is invalid
+    EXPECT_FALSE(planLineCrops(boxes, 2560, 3300, p).ok());
+}
+
 TEST(PlanLineCrops, RejectsBadInput) {
     LinePrepParams p;
     auto bad = [&](std::vector<BBox> b, int w = 100, int h = 100) {

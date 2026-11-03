@@ -1,9 +1,9 @@
 # LOOP_STATE — machine state for /engineer-step iterations
 
-Active milestone: M4 (M4.1–M4.4 shipped as one PR on user request; next: M4.5 CI)
+Active milestone: M4 (M4.5 deferred by user; next after M4.6: M4.7 PDF input)
 
 CURRENT: (none)
-branch: task/M4.1-M4.4-usable-product
+branch: task/M4.6-real-scans
 pr: (none)
 attempts: 0
 lastFailure: (none)
@@ -34,10 +34,11 @@ lastFailure: (none)
 - M4.1, 2026-11-02, "output: JSON schema cudaocr.page/1 with recognized word boxes (M4.1)"
 - M4.2, 2026-11-02, "output: hOCR formatter (M4.2)"
 - M4.3, 2026-11-02, "config: TOML pipeline config, --config/--print-config (M4.3)"
-- M4.4, 2026-11-02, "cli: multi-page input with one pipeline per run (M4.4)"
+- M4.4, 2026-11-02, "cli: multi-page input with one pipeline per run (M4.4)" — PR #15 merged
+- M4.6, 2026-11-02, "benchmarks: UNLV/ISRI real-scan accuracy; cap line width (M4.6)"
 
 ## AWAITING-MERGE
-- PR #15 https://github.com/agirishkumar/CudaOCR/pull/15 (task/M4.1-M4.4-usable-product)
+(none)
 
 ## BLOCKED
 (none)
