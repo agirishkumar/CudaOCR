@@ -1,4 +1,4 @@
-# Model card — line recognizer (M3)
+# Model card — line recognizer (PP-OCRv5 English)
 
 Files in this directory are **downloaded, not committed** (see `.gitignore`):
 
@@ -28,7 +28,7 @@ scripts/onnx_info.py models/rec.onnx --markdown   # regenerate the op table belo
 | input | `x` | `[N, 3, 48, W]` (N, W dynamic) | float32 |
 | output | `fetch_name_0` | `[N, T, 438]`, **T = ⌊W / 8⌋** | float32 |
 
-**Preprocessing** (what the M3.6 line-crop kernel must produce):
+**Preprocessing** (what the line-crop kernel `stages/line_prep` produces):
 1. Crop the line **tightly** to its text (the detector's line box + a few px). With generous
    margins the glyphs shrink below what the model reads — a crop with one-font-size margins
    decoded as empty.
@@ -37,7 +37,10 @@ scripts/onnx_info.py models/rec.onnx --markdown   # regenerate the op table belo
    irrelevant for gray input).
 4. Normalize: `x = (v / 255 − 0.5) / 0.5` → [−1, 1] (white paper = +1).
 5. *(Our choice, not a model fact)* batched lines are right-padded to a common W with +1
-   (white); to be validated against unpadded inference in M3.8.
+   (white), and each line is decoded only over its own ⌊W/8⌋ timesteps; verified to give the
+   same text as unbatched inference (`OnnxRecognizer.OutputMatchesInputOrderAndLineWidth`).
+6. Resized widths are capped at 6144 px (`maxWidth`): degenerate "lines" such as thin rules
+   otherwise become ~30,000 px wide and exhaust GPU memory in the attention layers.
 
 **Output** is already **softmax-normalized** (each timestep sums to 1 within 1e-4), so the
 recognizer emits probabilities as the `LineRecognizer` contract requires.
@@ -51,7 +54,7 @@ recognizer emits probabilities as the `LineRecognizer` contract requires.
 | 437 | space `" "` (not in `dict.txt`; appended by PaddleOCR's `use_space_char`) |
 
 **Verified end to end:** with exactly this preprocessing on the CPU and greedy CTC decoding,
-all three M3.1 single-line fixtures (sans, serif, mono; digits, brackets, `&`, punctuation)
+all three single-line fixtures in `tests/fixtures/synth` (sans, serif, mono; digits, brackets, `&`, punctuation)
 are read **exactly**.
 
 ## Graph (sizes the M5 custom-kernel work)

@@ -122,6 +122,19 @@ endif()
 
 # The ORT-backed recognizer is part of the library when ORT is enabled.
 if(CUDAOCR_WITH_ORT)
+  # Self-contained install: ship the ORT libraries the recognizer loads (core,
+  # shared-provider bridge, CUDA EP; not the large TensorRT EP) next to the
+  # binaries' RPATH, plus any fetched model under share/cudaocr/models.
+  file(GLOB CUDAOCR_ORT_LIBS
+       ${CUDAOCR_ORT_ROOT}/lib/libonnxruntime.so*
+       ${CUDAOCR_ORT_ROOT}/lib/libonnxruntime_providers_shared.so
+       ${CUDAOCR_ORT_ROOT}/lib/libonnxruntime_providers_cuda.so)
+  install(FILES ${CUDAOCR_ORT_LIBS} DESTINATION ${CMAKE_INSTALL_LIBDIR}/cudaocr)
+  set_target_properties(cudaocr cudaocr-eval PROPERTIES
+    INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}/cudaocr")
+  install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/models/
+          DESTINATION ${CMAKE_INSTALL_DATADIR}/cudaocr/models
+          FILES_MATCHING PATTERN "*.onnx" PATTERN "dict.txt" PATTERN "README.md")
   target_sources(cudaocr_lib PRIVATE src/components/onnx_line_recognizer.cpp)
   target_link_libraries(cudaocr_lib PUBLIC onnxruntime::onnxruntime)
   target_compile_definitions(cudaocr_lib PUBLIC CUDAOCR_WITH_ORT=1)
@@ -279,6 +292,11 @@ if(CUDAOCR_WITH_ORT)
            COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/unlv_ratchet.sh
                    $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval> 0.0784 0.2064)
   set_tests_properties(Accuracy.UnlvRatchet PROPERTIES SKIP_RETURN_CODE 77)
+endif()
+if(CUDAOCR_WITH_ORT)
+  add_test(NAME Install.SelfContained
+           COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/install_test.sh ${CMAKE_BINARY_DIR})
+  set_tests_properties(Install.SelfContained PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 add_test(NAME Cli.Config COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/cli_config_test.sh
                                  $<TARGET_FILE:cudaocr>)

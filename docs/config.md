@@ -31,6 +31,10 @@ decoder      = { name = "ctc-greedy" }
   too.
 - Parameter values are numbers, strings or booleans; components validate them when the
   pipeline is created (e.g. `median: k must be 3 or 5, got 4`).
+- Recognizer (`onnx`) parameters: `model`, `dict` (default: `$CUDAOCR_MODEL_DIR`, the install's
+  `share/cudaocr/models`, or the source tree's `models/`), `ep` (`cuda`/`cpu`), `maxBatch`
+  (16), `padFrac` (line-crop padding, 0.1), `maxWidth` (6144), `tf32` (false).
+- PDF rendering resolution is a command-line setting (`--pdf-dpi`), not part of the config.
 - Errors name the location: `my.toml:3:1: unknown key 'binariser' (known: ...)`.
 
 ## Flags vs file
