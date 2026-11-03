@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "cudaocr/eval/metrics.hpp"
+#include "cudaocr/version.hpp"
 
 namespace {
 
@@ -84,6 +85,9 @@ int main(int argc, char** argv) {
                 maxCer = std::strtod(v, &end);
                 if (*end != '\0' || maxCer < 0) return usage();
             }
+        } else if (a == "--version") {
+            std::printf("cudaocr-eval %s\n", cudaocr::version());
+            return 0;
         } else if (a == "-h" || a == "--help") {
             usage();
             return 0;

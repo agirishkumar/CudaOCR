@@ -17,7 +17,8 @@ Rules
 | W Workflow | CUDA arch default fix (W.1), branch-aware verify gate (W.2), whole-tree formatting (W.3) | #1, #2, #4 |
 | MOD Modular core | result types (MOD.1), component interfaces + Params (MOD.2), built-in components (MOD.3), registry + config-built Pipeline, stream-race fix (MOD.4) | #3, #5, #6, #7 |
 | M3 Functional OCR | synthetic fixtures (M3.1), CER/WER tool (M3.2), gray deskew (M3.3), ONNX Runtime (M3.4), model fetch + card (M3.5), line-prep kernel (M3.6), CTC decoder (M3.7), ONNX recognizer (M3.8), end-to-end text (M3.9), accuracy report + ratchets (M3.10), tuned defaults (M3.11) | #8–#14 |
-| M4 Usable product | JSON + word boxes (M4.1), hOCR (M4.2), TOML config (M4.3), multi-page input (M4.4), UNLV real-scan accuracy (M4.6), PDF input (M4.7); self-contained install | #15–#17 |
+| M4 Usable product | JSON + word boxes (M4.1), hOCR (M4.2), TOML config (M4.3), multi-page input (M4.4), UNLV real-scan accuracy (M4.6), PDF input (M4.7); self-contained install; repo cleanup + docs layout | #15–#19 |
+| Release 0.1.0 | `.deb` (Ubuntu 24.04/26.04), Docker image, `--version`, static CUDA runtime, third-party notices | this release |
 
 Deferred: **M4.5 GitHub Actions CI** (user decision 2026-11-02) — hosted runners have no
 GPU, so CI could only compile and format-check; `scripts/verify.sh` gates every PR locally.

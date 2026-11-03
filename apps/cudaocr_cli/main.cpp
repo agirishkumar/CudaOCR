@@ -16,6 +16,7 @@
 #include "cudaocr/core/logger.hpp"
 #include "cudaocr/core/pdf.hpp"
 #include "cudaocr/pipeline.hpp"
+#include "cudaocr/version.hpp"
 
 namespace {
 
@@ -59,6 +60,7 @@ void usage() {
         "  --benchmark           per-stage GPU timings\n"
         "  --dump-stages <dir>   gray/binary/deskewed images + box overlay per page\n"
         "  --log-level <trace|debug|info|warn|error>  (debug and below also write cudaocr.log)\n"
+        "  --version             version and build features\n"
         "\n"
         "Exit codes (worst page wins): 0 ok, 1 bad input/config, 2 runtime error,\n"
         "3 a page without text.\n");
@@ -320,6 +322,9 @@ int main(int argc, char** argv) {
                         : s == "error" ? LogLevel::Error
                                        : LogLevel::Info;
             }
+        } else if (a == "--version") {
+            std::fputs(buildInfo("cudaocr").c_str(), stdout);
+            return 0;
         } else if (a == "-h" || a == "--help") {
             usage();
             return 0;
