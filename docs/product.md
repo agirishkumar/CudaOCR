@@ -57,7 +57,7 @@ dependency-light, well-tested GPU pipeline.
 | Configuration | TOML config mirroring the component model; `--print-config` round-trips; flags override | `config`, [config.md](config.md) |
 | Evaluation | `cudaocr-eval` (CER/WER, UTF-8, wildcard), `accuracy_report.sh`, synthetic fixture generator, UNLV/ISRI fetcher, accuracy ratchets in ctest | `eval/`, `scripts/` |
 | Diagnostics | `-v` summaries, `--benchmark` per-stage GPU timings, `--dump-stages` images + overlay | CLI |
-| Install | `cmake --install` produces a self-contained prefix (binaries, ONNX Runtime libraries, model) | `CMakeLists.txt` |
+| Install / packaging | `.deb` for Ubuntu 24.04 and 26.04 and a Docker image (sm_75–sm_120, ONNX Runtime + model bundled, static CUDA runtime so only the driver is required to start); `cmake --install` produces the same self-contained layout | `scripts/package.sh`, `Dockerfile`, CPack in `CMakeLists.txt` |
 
 ## 5. Quality and performance (measured)
 

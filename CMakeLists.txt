@@ -4,7 +4,11 @@ cmake_minimum_required(VERSION 3.24)
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
   set(CMAKE_CUDA_ARCHITECTURES 86 CACHE STRING "CUDA architectures (default: RTX 3060 Laptop)")
 endif()
-project(cudaocr LANGUAGES CXX CUDA)
+project(cudaocr VERSION 0.1.0 LANGUAGES CXX CUDA)
+# Static CUDA runtime: the binaries then need only the NVIDIA driver to start
+# (GPU preprocessing + CPU recognition work everywhere); the CUDA math libraries
+# and cuDNN are needed only by ONNX Runtime's CUDA execution provider.
+set(CMAKE_CUDA_RUNTIME_LIBRARY Static)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -44,11 +48,12 @@ add_library(cudaocr_lib STATIC
   src/components/hocr_formatter.cpp
   src/components/words.cpp
   src/eval/metrics.cpp
+  src/version.cpp
   src/pipeline.cu
 )
 target_include_directories(cudaocr_lib PUBLIC include)
 target_include_directories(cudaocr_lib SYSTEM PUBLIC third_party)
-target_link_libraries(cudaocr_lib PUBLIC CUDA::cudart)
+target_link_libraries(cudaocr_lib PUBLIC CUDA::cudart_static)
 set_target_properties(cudaocr_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 add_executable(cudaocr apps/cudaocr_cli/main.cpp)
@@ -139,10 +144,18 @@ if(CUDAOCR_WITH_ORT)
   target_link_libraries(cudaocr_lib PUBLIC onnxruntime::onnxruntime)
   target_compile_definitions(cudaocr_lib PUBLIC CUDAOCR_WITH_ORT=1)
 endif()
+# The arch list is ';'-separated; a ';' inside a compile definition splits it.
+string(REPLACE ";" "," CUDAOCR_ARCHS_LABEL "${CMAKE_CUDA_ARCHITECTURES}")
 target_compile_definitions(cudaocr_lib PRIVATE
-  CUDAOCR_DEFAULT_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/models")
+  CUDAOCR_DEFAULT_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/models"
+  CUDAOCR_VERSION="${PROJECT_VERSION}"
+  CUDAOCR_ORT_VERSION="${CUDAOCR_ORT_VERSION}"
+  CUDAOCR_POPPLER_VERSION="${POPPLER_CPP_VERSION}"
+  CUDAOCR_CUDA_ARCHS="${CUDAOCR_ARCHS_LABEL}")
 
-# ---- tests ----
+# ---- tests (off for release/packaging builds: -DCUDAOCR_BUILD_TESTS=OFF) ----
+option(CUDAOCR_BUILD_TESTS "Build tests and benchmarks" ON)
+if(CUDAOCR_BUILD_TESTS)
 FetchContent_Declare(
   googletest
   URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.tar.gz
@@ -299,6 +312,9 @@ if(CUDAOCR_WITH_ORT)
            COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/install_test.sh ${CMAKE_BINARY_DIR})
   set_tests_properties(Install.SelfContained PROPERTIES SKIP_RETURN_CODE 77)
 endif()
+add_test(NAME Release.VersionAndRuntime
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/release_test.sh
+                 $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval>)
 add_test(NAME Cli.Config COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/cli_config_test.sh
                                  $<TARGET_FILE:cudaocr>)
 add_test(NAME Cli.BlankPageDetectOnlyExits3
@@ -315,3 +331,44 @@ add_test(NAME Scripts.ChangedFiles
 # ---- benchmarks (custom kernels vs NPP _Ctx) ----
 add_executable(bench benchmarks/bench.cu)
 target_link_libraries(bench PRIVATE cudaocr_lib CUDA::nppif CUDA::nppicc CUDA::nppig CUDA::nppc)
+endif()
+
+# ---- install extras + Debian package (cpack -G DEB; see scripts/package.sh) ----
+install(FILES README.md LICENSE THIRD_PARTY_NOTICES.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+if(CUDAOCR_WITH_ORT)
+  install(FILES ${CUDAOCR_ORT_ROOT}/LICENSE DESTINATION ${CMAKE_INSTALL_DOCDIR}/onnxruntime)
+  install(FILES ${CUDAOCR_ORT_ROOT}/ThirdPartyNotices.txt
+          DESTINATION ${CMAKE_INSTALL_DOCDIR}/onnxruntime OPTIONAL)
+endif()
+
+set(CUDAOCR_DEB_DISTRO "" CACHE STRING "Target distro tag for the .deb file name, e.g. ubuntu24.04")
+set(CPACK_PACKAGE_NAME cudaocr)
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_CONTACT "Girish <adari.girishkumar@gmail.com>")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "GPU OCR for printed documents and scanned PDFs (CUDA)")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/agirishkumar/CudaOCR")
+set(CPACK_DEBIAN_PACKAGE_SECTION graphics)
+set(CPACK_DEBIAN_PACKAGE_RELEASE 1)
+set(CPACK_DEBIAN_PACKAGE_DESCRIPTION
+"GPU OCR for printed documents and scanned PDFs (CUDA)
+ Custom CUDA kernels preprocess, deskew and segment each page; the bundled
+ PP-OCRv5 English model reads the lines through the bundled ONNX Runtime.
+ Outputs plain text, JSON (boxes + confidences) or hOCR.
+ .
+ Needs an NVIDIA GPU (sm_75 or newer) with a CUDA 13 driver. GPU recognition
+ also needs the CUDA 13 runtime libraries (cuBLAS, cuRAND, cudart) and cuDNN 9
+ from NVIDIA's apt repository; without them use --ep cpu.")
+set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "cudnn9-cuda-13")
+# Depends: computed by scripts/package.sh with dpkg-shlibdeps on the binaries
+# only (the bundled ORT CUDA provider's CUDA libraries are not pinned).
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS OFF)
+# The bundled ORT CUDA provider is ~270 MB; xz cuts the download substantially.
+set(CPACK_DEBIAN_COMPRESSION_TYPE xz)
+if(CUDAOCR_DEB_DISTRO)
+  set(CPACK_DEBIAN_FILE_NAME
+      "cudaocr_${PROJECT_VERSION}-1~${CUDAOCR_DEB_DISTRO}_amd64.deb")
+else()
+  set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+endif()
+set(CPACK_GENERATOR DEB)
+include(CPack)

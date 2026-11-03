@@ -43,8 +43,36 @@ image / PDF page ─► grayscale ─► median 3×3 ─► polarity ─┬─�
                      txt / JSON / hOCR ◄─ words + boxes ◄─ CTC decode ◄─ PP-OCRv5 (ONNX Runtime) ◄─ crop+resize to 48 px
 ```
 
-## Requirements
+## Install
 
+**Debian package** (Ubuntu 24.04 or 26.04, x86-64; from the
+[releases page](https://github.com/agirishkumar/CudaOCR/releases)): pick the file for your
+release, then
+
+```bash
+sudo apt install ./cudaocr_0.1.0-1~ubuntu24.04_amd64.deb
+```
+
+It bundles ONNX Runtime and the PP-OCRv5 model and runs on any NVIDIA GPU from sm_75
+(Turing) through sm_120 (Blackwell) with a CUDA 13 driver. **GPU recognition** additionally
+needs NVIDIA's CUDA 13 runtime libraries and cuDNN 9 from
+[NVIDIA's apt repository](https://developer.nvidia.com/cuda-downloads)
+(`sudo apt install cuda-libraries-13-4 cudnn9-cuda-13`); without them everything else runs
+and `--ep cpu` recognizes on the CPU.
+
+**Docker** (needs the NVIDIA Container Toolkit; the image includes CUDA, cuDNN and the model):
+
+```bash
+docker build -t cudaocr .
+docker run --rm --gpus all -v "$PWD":/data cudaocr scan.pdf -o out/
+```
+
+With the snap-packaged Docker, where `--gpus all` fails, use `--runtime=nvidia
+-e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=compute,utility` instead.
+
+## Build from source
+
+Requirements:
 - NVIDIA GPU, sm_75 or newer (default build target sm_86), CUDA Toolkit 13.x, CMake ≥ 3.24,
   a C++20 compiler (developed with g++ 15, CUDA 13.4, RTX 3060 Laptop).
 - **cuDNN 9 for CUDA 13** for GPU recognition: `sudo apt install cudnn9-cuda-13`.
@@ -54,8 +82,6 @@ image / PDF page ─► grayscale ─► median 3×3 ─► polarity ─┬─�
   GoogleTest, toml++ — all SHA-256 pinned. Image I/O (stb) is vendored.
 - Python 3 + Pillow only for the developer scripts (fixture generation, UNLV preparation).
 
-## Build
-
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
@@ -64,13 +90,10 @@ cmake --build build -j
 
 Options: `-DCUDAOCR_WITH_ORT=OFF` (no recognizer, detection only), `-DCUDAOCR_ORT_ROOT=<dir>`
 (reuse an extracted ONNX Runtime, e.g. `build/_deps/onnxruntime-src`),
-`-DCUDAOCR_WITH_PDF=OFF`, `-DCMAKE_CUDA_ARCHITECTURES=<sm>`.
-
-Install a self-contained copy (binaries, the ONNX Runtime libraries and the fetched model):
-
-```bash
-cmake --install build --prefix ~/.local
-```
+`-DCUDAOCR_WITH_PDF=OFF`, `-DCUDAOCR_BUILD_TESTS=OFF`, `-DCMAKE_CUDA_ARCHITECTURES=<list>`.
+`cmake --install build --prefix ~/.local` installs a self-contained copy (binaries, the ONNX
+Runtime libraries and the fetched model). Release packages: `scripts/package.sh host|noble|docker`
+(see [CHANGELOG.md](CHANGELOG.md)).
 
 ## Usage
 
@@ -148,6 +171,7 @@ ctest --test-dir build --output-on-failure      # ~200 tests (model-dependent on
 ./scripts/fetch_unlv.sh                         # optional real-scan set for the report and ratchet
 ./build/cudaocr-eval <pred_dir> <gt_dir>        # CER/WER of <stem>.txt vs <stem>.gt.txt
 ./build/bench                                   # custom kernels vs NPP
+./scripts/package.sh host|noble|docker          # release .deb packages / Docker image (dist/)
 ```
 
 Every GPU kernel lands with a CPU oracle and a comparison test (byte-exact for integer
@@ -165,5 +189,5 @@ CER ratchets — see [docs/architecture.md](docs/architecture.md) §8.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). The PP-OCRv5 model weights (fetched, not bundled) are
-Apache-2.0; poppler (optional PDF input) is GPL-2.0-or-later.
+MIT — see [LICENSE](LICENSE). Bundled and linked components (ONNX Runtime MIT, PP-OCRv5
+model Apache-2.0, poppler GPL-2.0-or-later, …): [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
