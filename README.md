@@ -52,7 +52,7 @@ image / PDF page ─► grayscale ─► median 3×3 ─► polarity ─┬─�
 release, then
 
 ```bash
-sudo apt install ./cudaocr_0.1.0-1~ubuntu24.04_amd64.deb
+sudo apt install ./cudaocr_0.1.0-1.ubuntu24.04_amd64.deb
 ```
 
 It bundles ONNX Runtime and the PP-OCRv5 model and runs on any NVIDIA GPU from sm_75
