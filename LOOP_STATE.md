@@ -38,7 +38,7 @@ lastFailure: (none)
 - M4.6, 2026-11-02, "benchmarks: UNLV/ISRI real-scan accuracy; cap line width (M4.6)"
 
 ## AWAITING-MERGE
-(none)
+- PR #16 https://github.com/agirishkumar/CudaOCR/pull/16 (task/M4.6-real-scans)
 
 ## BLOCKED
 (none)
