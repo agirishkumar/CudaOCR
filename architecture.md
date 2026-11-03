@@ -285,6 +285,8 @@ GPU determinism note: kernels that use `atomicAdd` on floats or reduction order 
 
 | 27 | 2026-11-02 | Real-scan evaluation on UNLV/ISRI bus.3B + doe3.3B: seeded 40-page sample, scored **zoned** (each ground-truth zone OCRed separately, joined in zone order — the ISRI protocol) and **full page**; GT `~` (undeterminable character) = one-character wildcard (`cudaocr-eval --ref-wildcard`); data fetched by script, never committed or quoted (UNLV licence) | full page only; mag/news sets; strip `~` | Zoned isolates recognition + line detection from layout (6.84 % vs 19.64 % shows where the remaining error is); mag/news are multi-column, out of the current detector's scope; stripping `~` would count every undeterminable character as an insertion. The wildcard is our approximation of ISRI's convention. |
 
+| 28 | 2026-11-02 | PDF input via poppler-cpp (system `libpoppler-cpp-dev`, pkg-config, optional `CUDAOCR_WITH_PDF`, linked PRIVATE into the library behind `PdfDocument`); pages rendered in-process to 8-bit gray at `--pdf-dpi` (300) and fed through the multi-page path as `<stem>-p001` … | shell out to `pdftoppm`; MuPDF (AGPL); pdfium prebuilt | In-process rendering needs no temp files or run-time tools; poppler-cpp is GPL-2+ like the system poppler (fine for this project, noted for redistribution), packaged on Ubuntu, and `format_gray8` renders straight to our input format. Measured on the fixture: PDF CER 0.48 % vs 0.24 % on the source PNGs (JPEG embedding + poppler resampling, ~7 gray levels mean difference — identical to pdftoppm). |
+
 *(Append new rows; never delete — supersede with a new row referencing the old.)*
 
 ## 12. Migration plan from current code (feeds BACKLOG.md M0)

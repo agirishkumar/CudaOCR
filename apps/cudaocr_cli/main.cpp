@@ -5,6 +5,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <optional>
 #include <set>
 #include <string>
@@ -13,6 +14,7 @@
 #include "cudaocr/config.hpp"
 #include "cudaocr/core/host_image.hpp"
 #include "cudaocr/core/logger.hpp"
+#include "cudaocr/core/pdf.hpp"
 #include "cudaocr/pipeline.hpp"
 
 namespace {
@@ -21,10 +23,12 @@ using namespace cudaocr;
 
 void usage() {
     std::printf(
-        "usage: cudaocr <image|dir>... [options]\n"
+        "usage: cudaocr <image|pdf|dir>... [options]\n"
         "Prints the recognized text to stdout (diagnostics go to stderr). Several images or a\n"
         "directory are processed with one pipeline: -o then names an output directory\n"
-        "(<stem>.<ext> per page); without -o, txt pages are separated by form feeds.\n"
+        "(<stem>.<ext> per page; PDF pages are <stem>-p001, ...); without -o, txt pages are\n"
+        "separated by form feeds.\n"
+        "  --pdf-dpi <n>         render PDF pages at n dpi (default 300)\n"
         "  --config <file.toml>  pipeline config (docs/config.md); flags below override it\n"
         "  --print-config        print the effective config as TOML and exit\n"
         "  -o <file>             write output to a file (.json -> JSON, .hocr/.html -> hOCR,\n"
@@ -146,22 +150,62 @@ bool isImageFile(const fs::path& p) {
     return false;
 }
 
-// Files as given; directories expand to their image files (non-recursive, sorted).
-std::vector<fs::path> expandInputs(const std::vector<std::string>& inputs, bool& sawDirectory) {
-    std::vector<fs::path> pages;
+bool isPdf(const fs::path& p) {
+    std::string ext = p.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return ext == ".pdf";
+}
+
+// One page to OCR: an image file, or page `pdfPage` (0-based) of a PDF.
+struct PageSource {
+    fs::path path;
+    int pdfPage = -1;
+    std::string stem;  // output name: file stem, or "<pdf stem>-p001" for PDF pages
+    std::string label() const {
+        return pdfPage < 0 ? path.string() : path.string() + " page " + std::to_string(pdfPage + 1);
+    }
+};
+
+// Files as given; directories expand to their image and PDF files (non-recursive,
+// sorted); PDFs expand to one entry per page. Opened PDFs are kept in `pdfs`.
+std::vector<PageSource> expandInputs(const std::vector<std::string>& inputs, bool& sawDirectory,
+                                     std::map<std::string, PdfDocument>& pdfs, int& openErrors) {
+    std::vector<fs::path> files;
     sawDirectory = false;
     for (const auto& in : inputs) {
         std::error_code ec;
         if (fs::is_directory(in, ec)) {
             sawDirectory = true;
-            std::vector<fs::path> files;
+            std::vector<fs::path> found;
             for (const auto& e : fs::directory_iterator(in, ec))
-                if (e.is_regular_file() && isImageFile(e.path())) files.push_back(e.path());
-            std::sort(files.begin(), files.end());
-            pages.insert(pages.end(), files.begin(), files.end());
+                if (e.is_regular_file() && (isImageFile(e.path()) || isPdf(e.path())))
+                    found.push_back(e.path());
+            std::sort(found.begin(), found.end());
+            files.insert(files.end(), found.begin(), found.end());
         } else {
-            pages.emplace_back(in);  // unreadable paths are reported when loaded
+            files.emplace_back(in);  // unreadable images are reported when loaded
         }
+    }
+    std::vector<PageSource> pages;
+    for (const auto& f : files) {
+        if (!isPdf(f)) {
+            pages.push_back({f, -1, f.stem().string()});
+            continue;
+        }
+        auto doc = PdfDocument::open(f.string());
+        if (!doc.ok()) {
+            std::fprintf(stderr, "error: %s\n", doc.status().message.c_str());
+            ++openErrors;
+            continue;
+        }
+        const int n = doc.value().pageCount();
+        for (int i = 0; i < n; ++i) {
+            char suffix[16];
+            std::snprintf(suffix, sizeof suffix, "-p%03d", i + 1);
+            pages.push_back({f, i, f.stem().string() + suffix});
+        }
+        pdfs.emplace(f.string(), doc.take());
     }
     return pages;
 }
@@ -203,6 +247,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     std::vector<std::string> inputs;
+    double pdfDpi = 300.0;
     std::string outPath, format, dumpDir, configPath;
     bool verbose = false, printConfig = false;
     Overrides knobs;
@@ -226,6 +271,14 @@ int main(int argc, char** argv) {
             knobs.tf32 = true;
         } else if (a == "--config") {
             if (const char* v = next()) configPath = v;
+        } else if (a == "--pdf-dpi") {
+            const char* v = next();
+            char* end = nullptr;
+            pdfDpi = v ? std::strtod(v, &end) : 0;
+            if (!v || *end != '\0' || !(pdfDpi > 0 && pdfDpi <= 2400)) {
+                std::fprintf(stderr, "error: --pdf-dpi must be a number in (0, 2400]\n");
+                return 1;
+            }
         } else if (a == "--print-config") {
             printConfig = true;
         } else if (a == "-v" || a == "--verbose") {
@@ -307,9 +360,11 @@ int main(int argc, char** argv) {
     Logger::setLevel(level);
 
     bool sawDirectory = false;
-    const std::vector<fs::path> pages = expandInputs(inputs, sawDirectory);
+    std::map<std::string, PdfDocument> pdfs;
+    int loadErrors = 0;
+    const std::vector<PageSource> pages = expandInputs(inputs, sawDirectory, pdfs, loadErrors);
     if (pages.empty()) {
-        std::fprintf(stderr, "error: no images found in the given directories\n");
+        if (!loadErrors) std::fprintf(stderr, "error: no images found in the given directories\n");
         return 1;
     }
     // Several pages (or any directory): -o names an output directory. A single
@@ -326,9 +381,9 @@ int main(int argc, char** argv) {
     if (outIsDir) {
         std::set<std::string> stems;
         for (const auto& p : pages)
-            if (!stems.insert(p.stem().string()).second) {
+            if (!stems.insert(p.stem).second) {
                 std::fprintf(stderr, "error: two inputs named '%s'; outputs would collide in %s\n",
-                             p.stem().c_str(), outPath.c_str());
+                             p.stem.c_str(), outPath.c_str());
                 return 1;
             }
         std::error_code ec;
@@ -352,12 +407,13 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    int loadErrors = 0, runErrors = 0, noText = 0, done = 0;
+    int runErrors = 0, noText = 0, done = 0;
     const auto start = std::chrono::steady_clock::now();
-    for (const fs::path& page : pages) {
-        const std::string path = page.string();
+    for (const PageSource& page : pages) {
+        const std::string path = page.label();
         Logger::log(LogLevel::Info, "processing " + path);
-        auto img = loadImage(path);
+        auto img = page.pdfPage < 0 ? loadImage(page.path.string())
+                                    : pdfs.at(page.path.string()).renderPage(page.pdfPage, pdfDpi);
         if (!img.ok()) {
             std::fprintf(stderr, "error: %s\n", img.status().message.c_str());
             ++loadErrors;
@@ -408,8 +464,7 @@ int main(int argc, char** argv) {
         const std::string& output = formatted.value();
         std::string target = outPath;
         if (outIsDir)
-            target = (fs::path(outPath) /
-                      (page.stem().string() + "." + std::string(fmt.value()->extension())))
+            target = (fs::path(outPath) / (page.stem + "." + std::string(fmt.value()->extension())))
                          .string();
         if (target.empty()) {
             if (multi && done > 1) std::fputs("\f", stdout);  // page separator (as Tesseract)
@@ -425,7 +480,7 @@ int main(int argc, char** argv) {
             if (verbose) std::fprintf(stderr, "wrote %s\n", target.c_str());
         }
         if (!dumpDir.empty()) {
-            const std::string dir = multi ? dumpDir + "/" + page.stem().string() : dumpDir;
+            const std::string dir = multi ? dumpDir + "/" + page.stem : dumpDir;
             dumpStages(dir, stages, r);
             if (verbose) std::fprintf(stderr, "stage dumps in %s/\n", dir.c_str());
         }
