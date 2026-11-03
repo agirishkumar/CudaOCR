@@ -6,7 +6,7 @@ Rules
 - Acceptance criteria must be machine-checkable. Add/split tasks freely; never reorder or delete a checked task.
 - Unchecked tasks may be moved between milestones; leave a "→ moved to" note.
 
-Active milestone: **M3** (MOD complete)
+Active milestone: **M4** (M4.7 next)
 
 ## M0 — Re-foundation ✅ (2026-06-11)
 
@@ -99,8 +99,11 @@ Active milestone: **M3** (MOD complete)
   *Accept:* parse/print round trip (`parse(print(cfg)) == cfg`) for the default and a full custom config; unknown keys/sections and bad values fail naming the location; `--print-config` output is a valid config; explicit CLI flags override file values, absent flags don't.
 - [x] **M4.4 Multi-page input** (directory / multiple paths; reuse one Pipeline + ORT session; per-page outputs).
   *Accept:* `cudaocr dir/ a.png -o out/` writes one output per page (sorted, extension from `--format`); one model load per run (measured speed-up vs per-page invocations); a bad page is reported and the rest still processed with a defined exit code; `accuracy_report.sh` uses one invocation per set.
-- [ ] **M4.5 GitHub Actions CI** (CUDA toolkit container, compile-only build with `CUDAOCR_WITH_ORT=ON`, clang-format check, host-only tests).
-- [ ] **M4.6 Real-scan accuracy** (20–50 UNLV/ISRI pages via a fetch script, not committed) → table in `benchmarks/ACCURACY.md`; README results section.
+- [x] **M4.6 Real-scan accuracy** (20–50 UNLV/ISRI pages via a fetch script, not committed) → table in `benchmarks/ACCURACY.md`; README results section.
+  *Done:* `scripts/fetch_unlv.sh` (bus.3B + doe3.3B, 43 MB, SHA-256 pinned; seeded 40-page sample, TIFF→PNG, zone crops); zoned 6.84 % / full-page 19.64 % CER; `Accuracy.UnlvRatchet`. Fixed on the way: thin rules detected as lines exhausted GPU memory (`maxWidth` cap). Data is © UNLV — never committed or quoted.
+- [ ] **M4.7 Native PDF input.** `cudaocr scan.pdf -o out/` rasterizes each page in-process (poppler-cpp, optional dependency like ORT; `libpoppler-cpp-dev` approved 2026-11-02) at a configurable DPI (default 300) and treats pages like multi-page input (`scan-p001.txt`, …).
+  *Accept:* a committed 2-page test PDF (generated from the synthetic fixtures) OCRs to the same text as its source PNGs (CER within 0.5 points); build without poppler still works and reports PDF input as unsupported; page count/DPI errors are clear.
+- M4.5 GitHub Actions CI → **deferred** (user decision 2026-11-02): hosted runners have no GPU, so CI could only compile/format-check; `scripts/verify.sh` already gates every PR locally. Revisit when there are outside contributors.
 
 ## M5 — Custom CUDA recognizer (ORT becomes the oracle)
 
@@ -120,5 +123,6 @@ Expand into per-op tasks after M3.5 documents the model's op list. Expected shap
 - [ ] **M6.4 GPU connected-component labeling** (was M2.5): union-find; char boxes for debug overlay. *Accept:* component count == CPU oracle.
 - [ ] **M6.5 CTC beam search + optional wordlist.**
 - [ ] **M6.6 Multi-stream batch throughput** for M4.4.
+- [ ] **M6.9 Full-page layout on real documents.** UNLV full page 19.64 % vs zoned 6.84 % CER: reading order across zones, tables, headers/footers and rules (projection profiles assume one column). Candidates: M6.3 DBNet detector, column/zone segmentation, rule removal before detection. *Accept:* unlv-page within 5 points of unlv-zoned.
 - [ ] **M6.8 Stained and speckled scans.** After M3.11 (C = 40): `noisy_text.png` 30.4 % CER (coffee stains, C = 50 gives 17 %), `vigorous-before.png` 156 % (isolated speckles recognized as characters). Candidates: Sauvola/Wolf local thresholding (stain-robust, keeps faint text), connected-component speck filter before detection (uses M6.4), per-line confidence gating of tiny/low-confidence lines. *Accept:* real-scan CER ≤ 2 % without regressing the clean ratchets.
 - [ ] **M6.7 Recognizer throughput.** Measured in M3.9 on `resources/sample.png` (35 lines, ~1290 px wide after upscaling small text to H=48): ORT CUDA EP **~267 ms/page warm** (first run ~660 ms: cuDNN/cuBLAS init), CPU EP ~2.3 s; maxBatch 8–16 is the sweet spot (1: 604 ms, 64: 302 ms); TF32 ≈ 3 %; cuDNN algo search HEURISTIC no change, DEFAULT slower. Target ≤ 150 ms/page. Profile with Nsight Systems first; candidates: IoBinding with preallocated outputs, CUDA graphs, FP16 model, TensorRT EP, downscale cap for very small text. *Accept:* ≤ 150 ms warm on sample.png with CER unchanged.

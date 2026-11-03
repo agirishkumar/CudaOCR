@@ -21,19 +21,25 @@ std::u32string utf8Decode(std::string_view s);
 std::string normalizeWhitespace(std::string_view s);
 
 // Unit-cost insert/delete/substitute distance; O(|a|*|b|) time, O(|b|) memory.
-template <typename Seq>
-size_t editDistance(const Seq& a, const Seq& b) {
+// `same(a_i, b_j)` decides whether a substitution is free (default: ==).
+template <typename Seq, typename Eq>
+size_t editDistance(const Seq& a, const Seq& b, Eq same) {
     std::vector<size_t> prev(b.size() + 1), cur(b.size() + 1);
     for (size_t j = 0; j <= b.size(); ++j) prev[j] = j;
     for (size_t i = 1; i <= a.size(); ++i) {
         cur[0] = i;
         for (size_t j = 1; j <= b.size(); ++j) {
-            const size_t sub = prev[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1);
+            const size_t sub = prev[j - 1] + (same(a[i - 1], b[j - 1]) ? 0 : 1);
             cur[j] = std::min({sub, prev[j] + 1, cur[j - 1] + 1});
         }
         std::swap(prev, cur);
     }
     return prev[b.size()];
+}
+
+template <typename Seq>
+size_t editDistance(const Seq& a, const Seq& b) {
+    return editDistance(a, b, [](const auto& x, const auto& y) { return x == y; });
 }
 
 struct ErrorCounts {
@@ -54,7 +60,13 @@ struct ErrorCounts {
     }
 };
 
-ErrorCounts charErrors(std::string_view reference, std::string_view hypothesis);
-ErrorCounts wordErrors(std::string_view reference, std::string_view hypothesis);
+// `refWildcard` (0 = none): a reference code point that matches any single
+// hypothesis character for free (UNLV ground truth writes undeterminable
+// characters as '~'); deleting it still costs 1. A wildcard inside a reference
+// word makes that position match anything in an equal-length hypothesis word.
+ErrorCounts charErrors(std::string_view reference, std::string_view hypothesis,
+                       char32_t refWildcard = 0);
+ErrorCounts wordErrors(std::string_view reference, std::string_view hypothesis,
+                       char32_t refWildcard = 0);
 
 }  // namespace cudaocr::eval

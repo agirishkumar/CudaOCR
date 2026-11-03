@@ -97,3 +97,34 @@ TEST(ErrorCounts, AggregatesAsTotalEditsOverTotalLength) {
 
 }  // namespace
 }  // namespace cudaocr::eval
+
+namespace cudaocr::eval {
+namespace {
+
+// M4.6: UNLV ground truth marks undeterminable characters with '~'.
+TEST(CharErrors, ReferenceWildcardMatchesAnyOneCharacter) {
+    EXPECT_EQ(charErrors("~~25%",
+                         "\xC2\xB1"
+                         "25%",
+                         U'~')
+                  .edits,
+              1u);  // ± for "~~": 1 deletion
+    EXPECT_EQ(charErrors("a~c", "abc", U'~').edits, 0u);
+    EXPECT_EQ(charErrors("a~c", "ac", U'~').edits, 1u);    // the wildcard still needs a char
+    EXPECT_EQ(charErrors("a~c", "abbc", U'~').edits, 1u);  // one extra char is an insertion
+    EXPECT_EQ(charErrors("a~c", "abc").edits, 1u);         // no wildcard: plain substitution
+    EXPECT_EQ(charErrors("~", "~", U'~').edits, 0u);
+}
+
+TEST(WordErrors, WildcardInsideAWordMatches) {
+    EXPECT_EQ(wordErrors("the ~~25% range",
+                         "the \xC2\xB1"
+                         "25% range",
+                         U'~')
+                  .edits,
+              1u);
+    EXPECT_EQ(wordErrors("the 2~% range", "the 25% range", U'~').edits, 0u);
+}
+
+}  // namespace
+}  // namespace cudaocr::eval

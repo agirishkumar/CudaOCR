@@ -249,6 +249,12 @@ if(CUDAOCR_WITH_ORT)
                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/real
                    sherlock noisy_text noisy_text2 vigorous-before)
   set_tests_properties(Accuracy.RealScansRatchet PROPERTIES SKIP_RETURN_CODE 77)
+  # UNLV/ISRI sample (scripts/fetch_unlv.sh, default 40 pages): M4.6 baseline
+  # zoned 6.84% -> max 7.84%, full page 19.64% -> max 20.64%.
+  add_test(NAME Accuracy.UnlvRatchet
+           COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/unlv_ratchet.sh
+                   $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval> 0.0784 0.2064)
+  set_tests_properties(Accuracy.UnlvRatchet PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 add_test(NAME Cli.Config COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/cli_config_test.sh
                                  $<TARGET_FILE:cudaocr>)

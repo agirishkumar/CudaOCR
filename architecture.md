@@ -283,6 +283,8 @@ GPU determinism note: kernels that use `atomicAdd` on floats or reduction order 
 
 | 26 | 2026-11-02 | Config = TOML via toml++ 3.4.0 (header-only, MIT, FetchContent, SHA-256 pinned, only `src/config.cpp` includes it); file mirrors `PipelineConfig` (component = inline table with `name` + params, `false` disables optional slots); CLI = defaults → `--config` → explicit flags only; canonical `toToml` makes `--print-config` round-trip | JSON/YAML config; flags rebuilding the whole config; hand-written parser | TOML was planned (§3) and is comment-friendly; mirroring the component model means a new component needs no config code; explicit-only overrides make the file authoritative; round trip is testable (`parse(print(c)) == c`). |
 
+| 27 | 2026-11-02 | Real-scan evaluation on UNLV/ISRI bus.3B + doe3.3B: seeded 40-page sample, scored **zoned** (each ground-truth zone OCRed separately, joined in zone order — the ISRI protocol) and **full page**; GT `~` (undeterminable character) = one-character wildcard (`cudaocr-eval --ref-wildcard`); data fetched by script, never committed or quoted (UNLV licence) | full page only; mag/news sets; strip `~` | Zoned isolates recognition + line detection from layout (6.84 % vs 19.64 % shows where the remaining error is); mag/news are multi-column, out of the current detector's scope; stripping `~` would count every undeterminable character as an insertion. The wildcard is our approximation of ISRI's convention. |
+
 *(Append new rows; never delete — supersede with a new row referencing the old.)*
 
 ## 12. Migration plan from current code (feeds BACKLOG.md M0)
