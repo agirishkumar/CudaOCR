@@ -29,11 +29,11 @@ trap 'rm -rf "$TMP"' EXIT
 run_set() {
     local name="$1" imgs="$2" gts="$3" pred="$TMP/$1"
     mkdir -p "$pred"
-    for gt in "$gts"/*.gt.txt; do
-        local stem; stem="$(basename "$gt" .gt.txt)"
-        # Exit code 3 (no text) is a valid outcome; it scores as all deletions.
-        "$BUILD/cudaocr" "$imgs/$stem.png" -o "$pred/$stem.txt" "${EXTRA[@]}" 2>/dev/null || [ $? -eq 3 ]
-    done
+    local images=()
+    for gt in "$gts"/*.gt.txt; do images+=("$imgs/$(basename "$gt" .gt.txt).png"); done
+    # One invocation (one model load) per set. Exit 3 (a page without text) is a
+    # valid outcome; it scores as all deletions.
+    "$BUILD/cudaocr" "${images[@]}" -o "$pred/" "${EXTRA[@]}" 2>/dev/null || [ $? -eq 3 ]
     {
         echo "### $name"
         echo

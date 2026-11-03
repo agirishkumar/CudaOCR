@@ -53,9 +53,23 @@ ctest --test-dir build --output-on-failure   # 60 tests, all GPU kernels vs CPU 
 ./build/cudaocr page.png -o page.json          # boxes + text + confidences as JSON
 ./build/cudaocr page.png -v --benchmark --dump-stages stages/   # diagnostics on stderr
 ./build/cudaocr page.png --no-recognize -o boxes.json           # detection only, no model
+./build/cudaocr scans/ more.png -o out/ --format json           # many pages, one model load
 ```
 
-Exit codes: 0 text found, 1 bad input/config, 2 GPU/runtime error, 3 no text found.
+Several images or directories are processed by one pipeline (one model load, ~6x faster
+than separate runs): `-o DIR` gets one `<stem>.<txt|json|hocr>` per page; without `-o`,
+text pages go to stdout separated by form feeds.
+
+Exit codes (worst page wins): 0 text found, 1 bad input/config, 2 GPU/runtime error,
+3 a page had no text.
+
+Configure the pipeline with a TOML file ([docs/config.md](docs/config.md)); explicit flags
+override it. Output formats: [docs/output-formats.md](docs/output-formats.md) (txt, JSON, hOCR).
+
+```bash
+./build/cudaocr --print-config > my.toml      # edit, then:
+./build/cudaocr --config my.toml page.png
+```
 
 Accuracy report over all fixture sets (writes `benchmarks/ACCURACY.md`):
 

@@ -24,6 +24,12 @@ class CtcProbs {
     std::vector<float>& data() { return data_; }
     const std::vector<float>& data() const { return data_; }
 
+    // Page geometry of the timesteps, filled by recognizers that know it:
+    // timestep t covers page columns [x0 + t * stepWidth, x0 + (t + 1) * stepWidth).
+    // stepWidth == 0 means unknown (no word boxes can be derived).
+    float x0 = 0.0f;
+    float stepWidth = 0.0f;
+
   private:
     int t_ = 0, c_ = 0;
     std::vector<float> data_;

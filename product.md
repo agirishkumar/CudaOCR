@@ -130,7 +130,7 @@ Ordering principle: **functional end-to-end first, then usable, then custom/opti
 | **W** Workflow fixes | Fix CUDA arch default; branch-aware `verify.sh` | ✅ done |
 | **MOD** Modular core | Result types, component interfaces, registry, Pipeline built from config; existing stages wrapped with zero behavior change | ✅ done |
 | **M3** Functional OCR | Ground-truth fixtures + CER tool, ORT dependency, line crop/normalize kernel, ONNX recognizer, CTC decoder, txt output, accuracy baseline | ✅ done (CER: synthetic 0.2–0.35 %, real scans 5.0 %, sherlock 0.94 %) |
-| **M4** Usable product | JSON/hOCR output, TOML config, multi-page input, GitHub Actions compile/format CI, README results tables | ⏳ next |
+| **M4** Usable product | JSON/hOCR output, TOML config, multi-page input, GitHub Actions compile/format CI, README results tables | M4.1–M4.4 ✅; M4.5 CI, M4.6 real-scan set ⏳ |
 | **M5** Custom recognizer | Hand-written CUDA inference for the recognition model; ORT as oracle | ⏳ |
 | **M6** Optimize & upgrade | Median/Gaussian optimization, DBNet detector swap-in, GPU CCL, beam search, dictionary correction, multi-stream batching | backlog |
 

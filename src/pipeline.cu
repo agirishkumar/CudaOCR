@@ -1,3 +1,4 @@
+#include "cudaocr/components/words.hpp"
 #include "cudaocr/core/device_buffer.cuh"
 #include "cudaocr/core/device_image.cuh"
 #include "cudaocr/core/logger.hpp"
@@ -202,6 +203,12 @@ Result<PageResult> Pipeline::run(const HostImage& input, StageImages* keep) {
             for (size_t i = 0; i < page.lines.size(); ++i) {
                 auto d = m.decoder->decode(probs[i], m.recognizer->charset());
                 if (!d.ok()) return d.status();
+                // Recognized words replace the detector's gap-based guesses when
+                // the recognizer reports timestep geometry.
+                if (probs[i].stepWidth > 0)
+                    page.lines[i].words =
+                        wordsFromCtc(d.value(), m.recognizer->charset(), probs[i].x0,
+                                     probs[i].stepWidth, page.lines[i].box);
                 page.lines[i].text = std::move(d.value().text);
                 page.lines[i].conf = d.value().conf;
             }
