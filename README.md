@@ -1,124 +1,167 @@
 # CudaOCR
 
-A GPU-first OCR engine written in CUDA/C++. Preprocessing, deskew, and
-segmentation run as hand-written CUDA kernels, each verified byte-for-byte (or
-within a documented tolerance) against a CPU oracle by the test suite.
-Libraries (NPP) appear only as benchmark baselines.
+A GPU-first OCR engine for printed documents, written in CUDA/C++. Image preprocessing,
+deskew, line detection and line cropping run as hand-written CUDA kernels — each verified
+against a CPU reference implementation by the test suite — and text recognition runs the
+PP-OCRv5 English model through ONNX Runtime on the GPU. One command turns scans, images or
+scanned PDFs into text, JSON or hOCR.
 
-**Status (2026-11):** end-to-end OCR works — GPU preprocessing, deskew and line
-detection, then PP-OCRv5 line recognition through ONNX Runtime (CUDA or CPU) and
-CTC decoding. Character error rate (`benchmarks/ACCURACY.md`): 0.21 % on 50
-synthetic pages, 0.94 % on a clean typeset book page, 5.0 % across the real
-scans (noisy/stained ones included). Next: JSON/hOCR/config/CI (M4).
-Goal: a functional, modular OCR whose parts can be swapped or optimized later —
-not a state-of-the-art competitor.
+```bash
+./build/cudaocr scan.pdf -o out/            # out/scan-p001.txt, out/scan-p002.txt, ...
+```
 
-See [product.md](product.md) for the vision, status, roadmap and evaluation data, [architecture.md](architecture.md)
-for design decisions, and [BACKLOG.md](BACKLOG.md) for the task queue.
+**Scope:** printed, mostly single-column documents (scans, screenshots, PDFs of scans).
+Not handwriting, scene text, or layout understanding (tables, forms). Goal: a functional,
+modular, well-tested OCR whose parts can be swapped or optimized — not a state-of-the-art
+competitor. Details: [product.md](product.md) · design: [architecture.md](architecture.md) ·
+open work: [BACKLOG.md](BACKLOG.md).
+
+## Features
+
+- **Inputs:** PNG, JPEG, BMP, TGA, GIF, PNM, **PDF** (each page rendered at 300 dpi, poppler),
+  any number of files and directories in one run.
+- **Outputs:** plain text; **JSON** with line/word boxes and confidences
+  ([schema](docs/output-formats.md)); **hOCR** for searchable-PDF tools.
+- **GPU pipeline:** grayscale → median denoise → polarity normalization (light-on-dark pages)
+  → adaptive (or Otsu) binarization → Hough skew detection + rotation → projection-profile
+  line detection → line crop/resize kernel → PP-OCRv5 recognizer (CUDA or CPU) → CTC decoding
+  → word boxes from CTC timesteps.
+- **Configurable and modular:** every stage is a named component; a TOML file
+  ([docs/config.md](docs/config.md)) or flags choose components and parameters.
+- **Batch mode:** one model load for all pages (~6× faster than one process per page).
+- **Measured:** CER/WER harness with synthetic, real and UNLV/ISRI test sets and accuracy
+  ratchets in the test suite.
 
 ## Pipeline
 
 ```
-image ─► grayscale ─► median denoise ─► polarity normalize ─► adaptive/Otsu
-      binarization ─► Hough skew detect + GPU rotate ─► line/word/char
-      segmentation ─► JSON + overlay output        (recognition: roadmap M3, custom kernels M5)
+image / PDF page ─► grayscale ─► median 3×3 ─► polarity ─┬─► adaptive threshold ─► Hough deskew ─► line detection
+                    (all custom CUDA kernels)            │                          (angle)       (row/column profiles)
+                                                         └─► deskewed gray ◄──────────┘                 │ line boxes
+                                                               │                                        ▼
+                     txt / JSON / hOCR ◄─ words + boxes ◄─ CTC decode ◄─ PP-OCRv5 (ONNX Runtime) ◄─ crop+resize to 48 px
 ```
 
 ## Requirements
 
-- CUDA Toolkit 13.x (developed on 13.1/13.4), GPU sm_75+ (default arch: 86)
-- CMake >= 3.24, a C++20 host compiler (developed with g++ 13 and 15)
-- No other system dependencies: image I/O is vendored (stb), GoogleTest is
-  fetched at configure time.
-- PDF input (optional): `sudo apt install libpoppler-cpp-dev` before configuring; without
-  it the build still works and PDF inputs report "built without PDF support"
-  (`-DCUDAOCR_WITH_PDF=OFF` silences the configure warning).
-- ONNX Runtime 1.31.1 (CUDA 13 build, ~233 MB, SHA-256 pinned) is downloaded at
-  configure time for the recognizer. Its CUDA execution provider needs cuDNN 9 for
-  CUDA 13 (`sudo apt install cudnn9-cuda-13`). Options:
-  `-DCUDAOCR_WITH_ORT=OFF` builds without it; `-DCUDAOCR_ORT_ROOT=<dir>` reuses an
-  extracted tree (e.g. `build/_deps/onnxruntime-src`) instead of downloading again.
+- NVIDIA GPU, sm_75 or newer (default build target sm_86), CUDA Toolkit 13.x, CMake ≥ 3.24,
+  a C++20 compiler (developed with g++ 15, CUDA 13.4, RTX 3060 Laptop).
+- **cuDNN 9 for CUDA 13** for GPU recognition: `sudo apt install cudnn9-cuda-13`.
+- **PDF input (optional):** `sudo apt install libpoppler-cpp-dev` before configuring. Without
+  it everything else works and PDFs report "built without PDF support".
+- Fetched automatically at configure time: ONNX Runtime 1.31.1 (CUDA 13 build, 233 MB),
+  GoogleTest, toml++ — all SHA-256 pinned. Image I/O (stb) is vendored.
+- Python 3 + Pillow only for the developer scripts (fixture generation, UNLV preparation).
 
-## Build & test
+## Build
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
-ctest --test-dir build --output-on-failure   # 60 tests, all GPU kernels vs CPU oracles
-./scripts/verify.sh                          # full gate: build + tests + memcheck
+./scripts/fetch_models.sh                  # recognition model (7.8 MB) into models/
 ```
 
-## Run
+Options: `-DCUDAOCR_WITH_ORT=OFF` (no recognizer, detection only), `-DCUDAOCR_ORT_ROOT=<dir>`
+(reuse an extracted ONNX Runtime, e.g. `build/_deps/onnxruntime-src`),
+`-DCUDAOCR_WITH_PDF=OFF`, `-DCMAKE_CUDA_ARCHITECTURES=<sm>`.
+
+Install a self-contained copy (binaries, the ONNX Runtime libraries and the fetched model):
 
 ```bash
-./scripts/fetch_models.sh                      # once: recognition model (7.8 MB) into models/
-./build/cudaocr page.png                       # recognized text on stdout
-./build/cudaocr page.png -o page.json          # boxes + text + confidences as JSON
-./build/cudaocr page.png -v --benchmark --dump-stages stages/   # diagnostics on stderr
+cmake --install build --prefix ~/.local
+```
+
+## Usage
+
+```bash
+./build/cudaocr page.png                          # text on stdout
+./build/cudaocr page.png -o page.json             # lines + words with boxes and confidences
+./build/cudaocr page.png -o page.hocr             # hOCR
+./build/cudaocr scan.pdf -o out/                  # one file per PDF page
+./build/cudaocr scans/ more.png -o out/ --format json   # many inputs, one model load
+./build/cudaocr scans/ > all.txt                  # pages separated by form feeds
+./build/cudaocr page.png -v --benchmark --dump-stages stages/   # summary, timings, overlays
 ./build/cudaocr page.png --no-recognize -o boxes.json           # detection only, no model
-./build/cudaocr scans/ more.png -o out/ --format json           # many pages, one model load
-./build/cudaocr scan.pdf -o out/                                # PDF: out/scan-p001.txt, ...
 ```
 
-Several images or directories are processed by one pipeline (one model load, ~6x faster
-than separate runs): `-o DIR` gets one `<stem>.<txt|json|hocr>` per page; without `-o`,
-text pages go to stdout separated by form feeds.
+`--dump-stages` writes the gray, binary and deskewed images plus `04_overlay.png` with the
+detected lines (blue) and words (red). Exit codes (worst page wins): 0 ok, 1 bad input or
+config, 2 GPU/runtime error, 3 a page without text. All flags: `./build/cudaocr --help`.
 
-Exit codes (worst page wins): 0 text found, 1 bad input/config, 2 GPU/runtime error,
-3 a page had no text.
-
-Configure the pipeline with a TOML file ([docs/config.md](docs/config.md)); explicit flags
-override it. Output formats: [docs/output-formats.md](docs/output-formats.md) (txt, JSON, hOCR).
+**Configuration** — print the effective config, edit it, load it (explicit flags still
+override the file):
 
 ```bash
-./build/cudaocr --print-config > my.toml      # edit, then:
+./build/cudaocr --print-config > my.toml
 ./build/cudaocr --config my.toml page.png
 ```
 
-Accuracy report over all fixture sets (writes `benchmarks/ACCURACY.md`):
+**Tuning tips:** `--C 50` helps stained or blotchy scans (higher loses faint print);
+`--pdf-dpi 400` for very small print in PDFs; `--ep cpu` runs without a GPU recognizer
+(about 8× slower).
 
-```bash
-./scripts/accuracy_report.sh [--large]      # --large adds a generated 50-page synthetic set
-```
+## Results
 
-Score OCR output against ground truth (CER/WER over Unicode code points, whitespace-normalized):
-
-```bash
-./build/cudaocr-eval <pred_dir> <gt_dir> [--max-cer 0.05]   # <name>.txt vs <name>.gt.txt
-```
-
-`--dump-stages` writes the intermediate images (gray, binary, deskewed binary, deskewed gray) plus an overlay with detected
-lines (blue), words (red), and characters (green). See `./build/cudaocr --help`
-for thresholding/deskew options.
-
-Example on `resources/sample.png` (699x921 scan, RTX 3060 Laptop):
-35 lines, 348 words, 903 characters in **~3 ms** of GPU pipeline time (`--benchmark`).
-
-## Accuracy
-
-Character / word error rate (lower is better) from `scripts/accuracy_report.sh --large`
-(details: [benchmarks/ACCURACY.md](benchmarks/ACCURACY.md)), RTX 3060 Laptop, default settings:
+Accuracy from `scripts/accuracy_report.sh --large` with default settings
+(per-file tables: [benchmarks/ACCURACY.md](benchmarks/ACCURACY.md)); lower is better:
 
 | Test set | Pages | CER | WER |
 |---|---:|---:|---:|
 | Synthetic pages (clean, skewed, noisy, inverted; generated) | 50 | 0.21 % | 1.00 % |
-| Real scans in `resources/` (incl. stained/noisy) | 4 | 5.01 % | 9.77 % |
-| UNLV/ISRI business letters + DOE reports, 300 dpi — zoned* | 40 | 6.84 % | 15.10 % |
-| UNLV/ISRI, same pages — full page, our own layout | 40 | 19.64 % | 29.94 % |
+| Clean typeset book page (`resources/sherlock.png`) | 1 | 0.94 % | 4.23 % |
+| Real scans in `resources/` (incl. stained and speckled) | 4 | 5.01 % | 9.77 % |
+| UNLV/ISRI business letters + DOE reports, 300 dpi — zoned\* | 40 | 6.84 % | 15.10 % |
+| UNLV/ISRI, same pages — full page | 40 | 19.64 % | 29.94 % |
 
-\*Zoned = each ground-truth text zone OCRed separately (the ISRI protocol); full page adds
-our projection-profile layout and reading order, which assumes a single column — the gap is
-the layout work in M6. UNLV data: `scripts/fetch_unlv.sh` (43 MB, not redistributable).
+\*Zoned: each ground-truth text zone OCRed separately (the ISRI protocol); full page adds our
+own layout and reading order, which assumes one text column — that gap is the main open
+work. UNLV data: `scripts/fetch_unlv.sh` (43 MB, not redistributable).
 
-## Benchmarks (`./build/bench`, 2500x3500, RTX 3060 Laptop, vs NPP)
+Speed (RTX 3060 Laptop, model warm, dense 33-line page `sherlock.png`): GPU preprocessing,
+deskew and line detection **≈ 3 ms**; recognition **≈ 370 ms** (the bottleneck; first page
+per process adds ≈ 0.5 s of model/cuDNN start-up). Custom kernels vs NVIDIA NPP on a
+2500×3500 image ([benchmarks/RESULTS.md](benchmarks/RESULTS.md)):
 
-| kernel | custom | NPP | ratio |
-|---|---|---|---|
-| grayscale | 0.137 ms | 0.113 ms | 1.22x |
-| gaussian 5x5 | 0.792 ms | 0.288 ms | 2.75x |
-| median 5x5 | 19.6 ms | 0.715 ms | 27x (optimization task filed) |
-| box mean 31x31 | 2.45 ms | 19.0 ms | **0.13x — 7.8x faster than NPP** |
+| Kernel | Custom | NPP | |
+|---|---:|---:|---|
+| grayscale | 0.137 ms | 0.112 ms | 1.2× NPP |
+| box mean 31×31 | 2.44 ms | 19.5 ms | **8× faster** |
+| Gaussian 5×5 | 0.76 ms | 0.29 ms | 2.6× NPP |
+| median 5×5 | 19.2 ms | 0.72 ms | 27× NPP (the pipeline uses 3×3: 0.2 ms) |
+
+## Known limitations
+
+- **Multi-column pages, tables, headers and figures:** projection-profile layout reads one
+  column top to bottom (UNLV full page 19.6 % vs 6.8 % zoned).
+- **Heavy stains and speckle noise:** coffee-stained scans ≈ 30 % CER; isolated specks can be
+  read as characters.
+- **Throughput:** ≈ 0.3–0.4 s per dense page, dominated by the recognizer.
+- English/Latin script only (the model's 436-character dictionary).
+
+## Development
+
+```bash
+ctest --test-dir build --output-on-failure      # ~200 tests (model-dependent ones skip if absent)
+./scripts/verify.sh                             # gate before every PR: build, tests, memcheck, format
+./scripts/accuracy_report.sh [--large]          # regenerate benchmarks/ACCURACY.md
+./scripts/fetch_unlv.sh                         # optional real-scan set for the report and ratchet
+./build/cudaocr-eval <pred_dir> <gt_dir>        # CER/WER of <stem>.txt vs <stem>.gt.txt
+./build/bench                                   # custom kernels vs NPP
+```
+
+Every GPU kernel lands with a CPU oracle and a comparison test (byte-exact for integer
+kernels), every fixed bug with a named regression test, and accuracy changes are guarded by
+CER ratchets — see [architecture.md](architecture.md) §8.
+
+| Path | Contents |
+|---|---|
+| `include/cudaocr/`, `src/` | library: `core/` (RAII GPU memory, streams, status, PDF), `stages/` (CUDA kernels), `components/` (pluggable stages, recognizer, formatters), `pipeline`, `config`, `eval/` |
+| `apps/` | `cudaocr` CLI, `cudaocr-eval` |
+| `tests/` | unit/integration tests, CPU oracles, fixtures (synthetic pages, real-scan ground truth, PDF) |
+| `scripts/` | `verify.sh`, `fetch_models.sh`, `fetch_unlv.sh`, `gen_fixtures.py`, `accuracy_report.sh`, `onnx_info.py` |
+| `docs/` | [config](docs/config.md), [output formats](docs/output-formats.md); model card: [models/README.md](models/README.md) |
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). The PP-OCRv5 model weights (fetched, not bundled) are
+Apache-2.0; poppler (optional PDF input) is GPL-2.0-or-later.

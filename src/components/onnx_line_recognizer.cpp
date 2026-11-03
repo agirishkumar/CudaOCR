@@ -47,7 +47,14 @@ const Charset& OnnxLineRecognizer::charset() const {
 
 std::string OnnxLineRecognizer::defaultModelDir() {
     if (const char* env = std::getenv("CUDAOCR_MODEL_DIR"); env && *env) return env;
-    return CUDAOCR_DEFAULT_MODEL_DIR;
+    // Installed layout: <prefix>/bin/<exe> and <prefix>/share/cudaocr/models.
+    std::error_code ec;
+    const std::filesystem::path exe = std::filesystem::read_symlink("/proc/self/exe", ec);
+    if (!ec) {
+        const auto installed = exe.parent_path().parent_path() / "share" / "cudaocr" / "models";
+        if (std::filesystem::exists(installed / "rec.onnx", ec)) return installed.string();
+    }
+    return CUDAOCR_DEFAULT_MODEL_DIR;  // source tree (build directory use)
 }
 
 Result<std::unique_ptr<OnnxLineRecognizer>> OnnxLineRecognizer::create(const Params& p) {
