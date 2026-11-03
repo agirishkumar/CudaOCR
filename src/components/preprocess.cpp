@@ -111,7 +111,7 @@ Status PolarityStage::run(const DeviceImage& in, DeviceImage& out, StageContext&
 // --- adaptive ---
 Result<std::unique_ptr<AdaptiveBinarizer>> AdaptiveBinarizer::create(const Params& p) {
     Status s = p.requireKnown({"blockSize", "C"}, "adaptive");
-    // C = 40 (was 10): see architecture.md decision #25 for the sweep.
+    // C = 40 (was 10): see docs/decisions.md #25 for the sweep.
     int blockSize = 31, C = 40;
     if (s.ok()) s = readInt(p, "blockSize", 31, blockSize);
     if (s.ok()) s = readInt(p, "C", 40, C);

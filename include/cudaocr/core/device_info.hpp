@@ -13,7 +13,7 @@ struct KernelArchInfo {
 
 // Probes a kernel compiled into the library. If the build lacks native SASS for
 // the device, kernels only run via PTX JIT — which fails outright when the
-// toolkit is newer than the driver (product.md §4.3 #1).
+// toolkit is newer than the driver (docs/product.md §6, fixed bugs).
 Result<KernelArchInfo> queryKernelArch();
 
 }  // namespace cudaocr

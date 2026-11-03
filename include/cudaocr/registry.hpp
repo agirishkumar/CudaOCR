@@ -31,7 +31,7 @@ class ComponentRegistry {
     template <typename I>
     using Factory = std::function<Result<std::unique_ptr<I>>(const Params&)>;
 
-    // Registry pre-populated with every built-in component (architecture.md §6.1).
+    // Registry pre-populated with every built-in component (docs/architecture.md §6.3).
     static ComponentRegistry withBuiltins();
 
     // InvalidArgument if `name` is already registered for interface I.

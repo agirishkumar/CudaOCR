@@ -25,8 +25,8 @@ TOML
 "$CLI" --config "$TMP/c.toml" --print-config | grep -q '^recognizer = false$' \
     && ok "recognizer = false honoured" || bad "recognizer = false"
 
-out=$("$CLI" "$ROOT/resources/sample.png" --config "$TMP/c.toml" -v 2>&1 >/dev/null)
-echo "$out" | grep -q "lines: 35" && ok "config drives a real run (detection only)" || { bad "config run"; echo "$out"; }
+out=$("$CLI" "$ROOT/resources/sherlock.png" --config "$TMP/c.toml" -v 2>&1 >/dev/null)
+echo "$out" | grep -q "lines: 31" && ok "config drives a real run (detection only)" || { bad "config run"; echo "$out"; }
 
 printf '\n\nbinariser = { name = "otsu" }\n' > "$TMP/typo.toml"
 msg=$("$CLI" --config "$TMP/typo.toml" --print-config 2>&1 >/dev/null); rc=$?

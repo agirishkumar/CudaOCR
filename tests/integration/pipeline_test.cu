@@ -64,7 +64,7 @@ TEST(Pipeline, OtsuVariantWorks) {
 }
 
 TEST(Pipeline, RunsOnRealSampleFixture) {
-    auto img = loadImage(std::string(CUDAOCR_FIXTURE_DIR) + "/sample.png");
+    auto img = loadImage(std::string(CUDAOCR_FIXTURE_DIR) + "/sherlock.png");
     ASSERT_TRUE(img.ok()) << img.status().message;
     auto p = Pipeline::create(PipelineConfig{});
     ASSERT_TRUE(p.ok());
@@ -150,7 +150,7 @@ namespace cudaocr {
 namespace {
 
 // M3.11: denoising that helps binarization (median) blurs thin gaps the
-// recognizer needs (doubled letters merged on sample.png), so binarizePrep
+// recognizer needs (it appeared to merge doubled letters on one scan), so binarizePrep
 // stages feed only the binarizer; the gray page the recognizer reads (and
 // StageImages::gray) skips them.
 TEST(Pipeline, BinarizePrepDoesNotTouchTheRecognizerGray) {

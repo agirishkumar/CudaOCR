@@ -31,10 +31,11 @@ TEST(HostImage, PngRoundTrip) {
 }
 
 TEST(HostImage, LoadFixtureSample) {
-    auto img = loadImage(std::string(CUDAOCR_FIXTURE_DIR) + "/sample.png");
+    auto img = loadImage(std::string(CUDAOCR_FIXTURE_DIR) + "/sherlock.png");  // RGBA PNG
     ASSERT_TRUE(img.ok()) << img.status().message;
-    EXPECT_GT(img.value().width, 0);
-    EXPECT_GT(img.value().height, 0);
+    EXPECT_EQ(img.value().width, 1390);
+    EXPECT_EQ(img.value().height, 925);
+    EXPECT_EQ(img.value().channels, 3);  // alpha dropped
 }
 
 TEST(HostImage, LoadMissingFileFails) {
