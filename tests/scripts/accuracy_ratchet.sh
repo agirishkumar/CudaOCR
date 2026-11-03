@@ -14,8 +14,10 @@ while [ $# -gt 0 ] && [ "$1" != "--" ]; do STEMS+=("$1"); shift; done
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/pred" "$TMP/gt"
+IMAGES=()
 for s in "${STEMS[@]}"; do
     cp "$GTS/$s.gt.txt" "$TMP/gt/"
-    "$CLI" "$IMGS/$s.png" -o "$TMP/pred/$s.txt" "$@" 2>/dev/null || [ $? -eq 3 ]
+    IMAGES+=("$IMGS/$s.png")
 done
+"$CLI" "${IMAGES[@]}" -o "$TMP/pred/" "$@" 2>/dev/null || [ $? -eq 3 ]
 "$EVAL" "$TMP/pred" "$TMP/gt" --max-cer "$MAX"

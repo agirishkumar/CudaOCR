@@ -1,5 +1,7 @@
 #include "cudaocr/components/ctc_greedy_decoder.hpp"
+#include "cudaocr/components/hocr_formatter.hpp"
 #include "cudaocr/components/hough_deskewer.hpp"
+#include "cudaocr/components/json_formatter.hpp"
 #ifdef CUDAOCR_WITH_ORT
 #include "cudaocr/components/onnx_line_recognizer.hpp"
 #endif
@@ -37,6 +39,8 @@ ComponentRegistry ComponentRegistry::withBuiltins() {
     (void)r.add<TextDetector>("projection", factoryOf<ProjectionDetector, TextDetector>());
     (void)r.add<Decoder>("ctc-greedy", factoryOf<CtcGreedyDecoder, Decoder>());
     (void)r.add<Formatter>("txt", factoryOf<TxtFormatter, Formatter>());
+    (void)r.add<Formatter>("json", factoryOf<JsonFormatter, Formatter>());
+    (void)r.add<Formatter>("hocr", factoryOf<HocrFormatter, Formatter>());
 #ifdef CUDAOCR_WITH_ORT
     (void)r.add<LineRecognizer>("onnx", factoryOf<OnnxLineRecognizer, LineRecognizer>());
 #endif

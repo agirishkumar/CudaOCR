@@ -30,6 +30,8 @@ Result<DecodedLine> CtcGreedyDecoder::decode(const CtcProbs& probs, const Charse
         if (best != charset.blank && best != prev) {
             out.text += charset.symbols[best];
             out.timesteps.push_back(t);
+            out.classes.push_back(best);
+            out.probs.push_back(probs.at(t, best));
             confSum += probs.at(t, best);
         }
         prev = best;

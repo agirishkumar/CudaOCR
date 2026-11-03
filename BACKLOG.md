@@ -91,10 +91,14 @@ Active milestone: **M3** (MOD complete)
 
 ## M4 — Usable product
 
-- [ ] **M4.1 JSON formatter** (page → lines → words with boxes, text, confidences; schema documented). Word boxes from CTC timestep → x-coordinate mapping.
-- [ ] **M4.2 hOCR formatter** (validates as well-formed XHTML; `ocr_line`/`ocrx_word` with `bbox`).
-- [ ] **M4.3 TOML config** (toml++ via FetchContent): full `PipelineConfig` from file, CLI overrides on top; `--print-config`.
-- [ ] **M4.4 Multi-page input** (directory / multiple paths; reuse one Pipeline + ORT session; per-page outputs).
+- [x] **M4.1 JSON formatter** (page → lines → words with boxes, text, confidences; schema documented). Word boxes from CTC timestep → x-coordinate mapping.
+  *Accept:* `json` formatter with exact-output unit test; schema `cudaocr.page/1` in `docs/output-formats.md`; CLI JSON parses and matches the schema (Python check); recognized word boxes vs projection boxes on a clean page: mean IoU ≥ 0.9, min ≥ 0.75.
+- [x] **M4.2 hOCR formatter** (validates as well-formed XHTML; `ocr_line`/`ocrx_word` with `bbox`).
+  *Accept:* exact-output unit test incl. escaping; CLI output parses with Python's XML parser and has one `ocr_line` per line and one `ocrx_word` per word with `bbox` and `x_wconf`.
+- [x] **M4.3 TOML config** (toml++ via FetchContent): full `PipelineConfig` from file, CLI overrides on top; `--print-config`.
+  *Accept:* parse/print round trip (`parse(print(cfg)) == cfg`) for the default and a full custom config; unknown keys/sections and bad values fail naming the location; `--print-config` output is a valid config; explicit CLI flags override file values, absent flags don't.
+- [x] **M4.4 Multi-page input** (directory / multiple paths; reuse one Pipeline + ORT session; per-page outputs).
+  *Accept:* `cudaocr dir/ a.png -o out/` writes one output per page (sorted, extension from `--format`); one model load per run (measured speed-up vs per-page invocations); a bad page is reported and the rest still processed with a defined exit code; `accuracy_report.sh` uses one invocation per set.
 - [ ] **M4.5 GitHub Actions CI** (CUDA toolkit container, compile-only build with `CUDAOCR_WITH_ORT=ON`, clang-format check, host-only tests).
 - [ ] **M4.6 Real-scan accuracy** (20–50 UNLV/ISRI pages via a fetch script, not committed) → table in `benchmarks/ACCURACY.md`; README results section.
 
