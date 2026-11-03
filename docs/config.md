@@ -12,7 +12,7 @@ cudaocr --config my.toml --print-config   # prints the same file back (round tri
 ## Format
 
 Each pipeline slot is a component: a `name` registered in `ComponentRegistry`
-(architecture.md §6.1 lists them with their parameters) plus that component's
+([architecture.md](architecture.md) §6.3 lists them with their parameters) plus that component's
 parameters. Keys you leave out keep their default.
 
 ```toml

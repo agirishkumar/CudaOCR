@@ -25,8 +25,8 @@ TEST(Grayscale, MatchesOracleOnRandomImage) {
 }
 
 TEST(Grayscale, MatchesOracleOnSampleFixture) {
-    // sample.png stores 1 channel; replicate it to exercise the kernel on real data.
-    auto loaded = loadImage(std::string(CUDAOCR_FIXTURE_DIR) + "/sample.png");
+    // Real page (RGBA PNG loaded as 3 channels); 1-channel inputs are replicated.
+    auto loaded = loadImage(std::string(CUDAOCR_FIXTURE_DIR) + "/sherlock.png");
     ASSERT_TRUE(loaded.ok()) << loaded.status().message;
     const HostImage& src = loaded.value();
     HostImage rgb = HostImage::create(src.width, src.height, 3);

@@ -18,7 +18,7 @@ namespace cudaocr {
 struct LinePrepParams {
     int height = 48;       // model input height
     float padFrac = 0.1f;  // padding on every side, as a fraction of the box height
-                           // (0.10 measured best: see architecture.md decision #23)
+                           // (0.10 measured best: see docs/decisions.md #23)
     int minWidth = 8;      // model needs >= 8 px (one CTC timestep per 8 px)
     // Cap on the resized width (0 = none); wider lines are squeezed. Real full-width
     // text lines resize to ~3000-4400 px; thin rules detected as lines reached

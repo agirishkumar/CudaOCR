@@ -205,19 +205,19 @@ set_target_properties(unit_tests PROPERTIES
 include(GoogleTest)
 gtest_discover_tests(unit_tests DISCOVERY_TIMEOUT 60)
 
-# CLI smoke tests: pin the end-to-end counts on the real sample scan through
-# argument parsing and printing. Default counts changed in M3.11 (adaptive C
-# 10 -> 40): 348 words / 903 glyph boxes -> 353 / 1233.
-add_test(NAME Cli.SampleDefault COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png -v --no-recognize)
+# CLI smoke tests: pin the detection counts on the reference page through argument
+# parsing and printing (resources/sherlock.png, 1390x925, 33 text lines; the two
+# centred headings plus the drop cap merge into fewer projection bands).
+add_test(NAME Cli.SampleDefault COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sherlock.png -v --no-recognize)
 set_tests_properties(Cli.SampleDefault PROPERTIES
-  PASS_REGULAR_EXPRESSION "lines: 35   words: 353   chars: 1233")
+  PASS_REGULAR_EXPRESSION "lines: 31   words: 719   chars: 3441")
 add_test(NAME Cli.SampleOtsuNoDeskew
-         COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png --otsu --no-deskew -v
+         COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sherlock.png --otsu --no-deskew -v
                  --no-recognize)
 set_tests_properties(Cli.SampleOtsuNoDeskew PROPERTIES
-  PASS_REGULAR_EXPRESSION "otsu thresh: +[0-9]+.*lines: 35   words: 353   chars: 1436")
+  PASS_REGULAR_EXPRESSION "otsu thresh: +[0-9]+.*lines: 31   words: 722   chars: 4176")
 add_test(NAME Cli.BadParamIsConfigError
-         COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sample.png --C abc --no-recognize)
+         COMMAND cudaocr ${CMAKE_CURRENT_SOURCE_DIR}/resources/sherlock.png --C abc --no-recognize)
 set_tests_properties(Cli.BadParamIsConfigError PROPERTIES WILL_FAIL TRUE)
 
 # cudaocr-eval on a tiny fixture: exact (0/11 chars, 0/2 words), one-char typo
@@ -269,7 +269,8 @@ if(CUDAOCR_WITH_ORT)
                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/real sherlock)
   set_tests_properties(Accuracy.SherlockRatchet PROPERTIES SKIP_RETURN_CODE 77)
   # M3.11 levels (adaptive C = 40): all committed synthetic fixtures 0.35% -> max
-  # 1.35%; all real scans 5.01% -> max 6.01%.
+  # 1.35%; real scans (sherlock + noisy_text*, after the 2026-11-02 resources
+  # cleanup) 4.75% -> max 5.75%.
   add_test(NAME Accuracy.SynthCiRatchet
            COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/accuracy_ratchet.sh
                    $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval> 0.0135
@@ -281,10 +282,10 @@ if(CUDAOCR_WITH_ORT)
   set_tests_properties(Accuracy.SynthCiRatchet PROPERTIES SKIP_RETURN_CODE 77)
   add_test(NAME Accuracy.RealScansRatchet
            COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/accuracy_ratchet.sh
-                   $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval> 0.0601
+                   $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval> 0.0575
                    ${CMAKE_CURRENT_SOURCE_DIR}/resources
                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/real
-                   sherlock noisy_text noisy_text2 vigorous-before)
+                   sherlock noisy_text noisy_text2)
   set_tests_properties(Accuracy.RealScansRatchet PROPERTIES SKIP_RETURN_CODE 77)
   # UNLV/ISRI sample (scripts/fetch_unlv.sh, default 40 pages): M4.6 baseline
   # zoned 6.84% -> max 7.84%, full page 19.64% -> max 20.64%.

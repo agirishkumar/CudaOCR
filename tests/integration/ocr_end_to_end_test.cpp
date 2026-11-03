@@ -85,8 +85,8 @@ TEST(OcrEndToEnd, RealSampleProducesText) {
     REQUIRE_MODEL();
     auto pipe = Pipeline::create(ocrConfig());
     ASSERT_TRUE(pipe.ok());
-    const std::string text = ocr(pipe.value(), fs::path(CUDAOCR_FIXTURE_DIR) / "sample.png");
-    EXPECT_GT(text.size(), 200u) << text;  // 35 lines of prose
+    const std::string text = ocr(pipe.value(), fs::path(CUDAOCR_FIXTURE_DIR) / "sherlock.png");
+    EXPECT_GT(text.size(), 3000u) << text;  // 33 lines of prose
 }
 
 TEST(OcrEndToEnd, CpuAndCudaGiveTheSameText) {
