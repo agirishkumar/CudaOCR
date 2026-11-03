@@ -39,7 +39,7 @@ lastFailure: (none)
 - M4.7, 2026-11-02, "input: native PDF pages via poppler-cpp (M4.7)"
 
 ## AWAITING-MERGE
-(none)
+- PR #17 https://github.com/agirishkumar/CudaOCR/pull/17 (task/M4.7-pdf-input)
 
 ## BLOCKED
 (none)
