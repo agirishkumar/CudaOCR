@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CudaOCR</title>
+<meta name="description" content="A GPU-first OCR engine for printed documents: hand-written CUDA preprocessing, deskew and line detection, PP-OCRv5 recognition through ONNX Runtime.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2376b900'/%3E%3Cpath d='M8 10h16M8 16h12M8 22h14' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #fbfbf9;
+  --surface: #ffffff;
+  --surface-2: #f1f2ee;
+  --text: #1b1d1a;
+  --muted: #5d6259;
+  --line: #dfe1db;
+  --accent: #4d7a00;
+  --accent-soft: #e9f2d9;
+  --bar: #76b900;
+  --bar-2: #b9c4ad;
+  --warn: #a3470d;
+  --code-bg: #1d201b;
+  --code-text: #e8ebe3;
+  --img-frame: #ffffff;
+  --shadow: 0 1px 2px rgba(20, 24, 16, .06), 0 4px 16px rgba(20, 24, 16, .05);
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121411;
+    --surface: #1a1d18;
+    --surface-2: #22261f;
+    --text: #e7eae2;
+    --muted: #a0a699;
+    --line: #2f342b;
+    --accent: #9bd43a;
+    --accent-soft: #263317;
+    --bar: #8fcf2a;
+    --bar-2: #4a5242;
+    --warn: #f0a46a;
+    --code-bg: #0b0d0a;
+    --code-text: #e1e5da;
+    --img-frame: #e9eae6;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 16px rgba(0, 0, 0, .25);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121411;
+  --surface: #1a1d18;
+  --surface-2: #22261f;
+  --text: #e7eae2;
+  --muted: #a0a699;
+  --line: #2f342b;
+  --accent: #9bd43a;
+  --accent-soft: #263317;
+  --bar: #8fcf2a;
+  --bar-2: #4a5242;
+  --warn: #f0a46a;
+  --code-bg: #0b0d0a;
+  --code-text: #e1e5da;
+  --img-frame: #e9eae6;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 4px 16px rgba(0, 0, 0, .25);
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.6 var(--sans);
+}
+a { color: var(--accent); text-underline-offset: 2px; }
+code, pre { font-family: var(--mono); font-size: .88em; }
+:not(pre) > code { background: var(--surface-2); padding: .1em .35em; border-radius: 4px; }
+pre {
+  margin: 0;
+  background: var(--code-bg);
+  color: var(--code-text);
+  padding: 14px 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+pre .c { color: #8d9685; }
+img { max-width: 100%; height: auto; display: block; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+
+/* header */
+.top {
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+.top .wrap { display: flex; align-items: center; gap: 20px; height: 52px; }
+.brand { font-weight: 700; color: var(--text); text-decoration: none; letter-spacing: -.01em; }
+.nav { display: flex; gap: 18px; margin-left: auto; font-size: .92rem; }
+.nav a { color: var(--muted); text-decoration: none; }
+.nav a:hover { color: var(--text); }
+@media (max-width: 640px) { .nav .opt { display: none; } }
+@media (max-width: 480px) { .nav .opt2 { display: none; } .nav { gap: 14px; } .top .wrap { gap: 12px; } }
+
+/* hero */
+.hero { padding-top: 64px; padding-bottom: 40px; }
+.hero h1 { overflow-wrap: break-word; font-size: clamp(2rem, 5vw, 3rem); line-height: 1.1; margin: 0 0 16px; letter-spacing: -.02em; }
+.hero p.lede { font-size: 1.15rem; color: var(--muted); max-width: 680px; margin: 0 0 24px; }
+.cta { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 28px; }
+.btn {
+  display: inline-block; padding: 9px 16px; border-radius: 8px; text-decoration: none;
+  font-weight: 600; font-size: .95rem; border: 1px solid var(--line); color: var(--text); background: var(--surface);
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 32px; }
+.fact { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.fact b { display: block; font-size: 1.5rem; letter-spacing: -.02em; }
+.fact span { color: var(--muted); font-size: .85rem; }
+@media (max-width: 720px) { .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* sections */
+section { padding: 48px 0; border-top: 1px solid var(--line); scroll-margin-top: 52px; }
+h2 { font-size: 1.6rem; margin: 0 0 8px; letter-spacing: -.015em; }
+h3 { font-size: 1.05rem; margin: 0 0 6px; }
+.sub { color: var(--muted); margin: 0 0 28px; max-width: 720px; }
+
+/* walkthrough */
+.stage-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.stage-tabs button {
+  font: inherit; font-size: .9rem; cursor: pointer; padding: 7px 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+}
+.stage-tabs button[aria-selected="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--text); font-weight: 600; }
+.stage-view { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 820px) { .stage-view { grid-template-columns: minmax(0, 1fr); } }
+.frame { background: var(--img-frame); border: 1px solid var(--line); border-radius: 10px; padding: 10px; box-shadow: var(--shadow); }
+.frame img { image-rendering: auto; width: 100%; }
+.stage-text h3 { margin-top: 4px; }
+.stage-text p { margin: 0 0 12px; }
+.kernel { font-family: var(--mono); font-size: .8rem; color: var(--muted); }
+.ocr-out { white-space: pre-wrap; font-size: .82rem; }
+
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; margin-top: 40px; }
+@media (max-width: 820px) { .pair { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+.card p { margin: 0 0 12px; color: var(--muted); }
+.duo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.duo figure { margin: 0; }
+figcaption { font-size: .8rem; color: var(--muted); margin-top: 6px; }
+.frame figcaption { color: #5d6259; }
+
+/* charts */
+.charts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+@media (max-width: 820px) { .charts { grid-template-columns: minmax(0, 1fr); } }
+.bars { display: grid; gap: 12px; }
+.bar-row { display: grid; grid-template-columns: minmax(0, 1fr) 64px; gap: 4px 10px; align-items: center; font-size: .9rem; }
+.bar-row .label { grid-column: 1 / -1; color: var(--muted); font-size: .85rem; }
+.track { background: var(--surface-2); border-radius: 4px; height: 14px; overflow: hidden; }
+.fill { background: var(--bar); height: 100%; border-radius: 4px; }
+.fill.alt { background: var(--bar-2); }
+.val { font-variant-numeric: tabular-nums; text-align: right; font-weight: 600; }
+.note { font-size: .82rem; color: var(--muted); margin-top: 14px; }
+.split { display: flex; height: 28px; border-radius: 6px; overflow: hidden; margin: 14px 0 8px; }
+.split .pre { background: var(--accent); width: 0.8%; min-width: 4px; }
+.split .rec { background: var(--bar-2); flex: 1; }
+.legend { display: flex; justify-content: space-between; font-size: .85rem; color: var(--muted); gap: 12px; }
+.legend b { color: var(--text); }
+table { width: 100%; border-collapse: collapse; font-size: .9rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; font-size: .82rem; }
+td.num, th.num { text-align: right; }
+.good { color: var(--accent); font-weight: 600; }
+.table-scroll { overflow-x: auto; }
+
+/* stories */
+.stories { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 820px) { .stories { grid-template-columns: minmax(0, 1fr); } }
+.story { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+.story .tag { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
+.story h3 { margin: 6px 0 8px; }
+.story p { margin: 0 0 10px; color: var(--muted); font-size: .94rem; }
+.story .test { font-family: var(--mono); font-size: .76rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 4px; overflow-wrap: anywhere; }
+
+/* limits */
+.limits { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 820px) { .limits { grid-template-columns: minmax(0, 1fr); } }
+.limits ul { margin: 0; padding-left: 20px; }
+.limits li { margin-bottom: 10px; }
+
+/* quickstart */
+.qs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 900px) { .qs { grid-template-columns: minmax(0, 1fr); } }
+.qs .card p { font-size: .9rem; }
+.qs pre { font-size: .8rem; }
+
+footer { border-top: 1px solid var(--line); padding: 32px 0 48px; color: var(--muted); font-size: .85rem; }
+footer p { margin: 0 0 8px; }
+.theme-toggle {
+  margin-left: 8px; font: inherit; font-size: .85rem; cursor: pointer; color: var(--muted);
+  background: none; border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px;
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#">CudaOCR</a>
+    <nav class="nav">
+      <a class="opt2" href="#pipeline">Pipeline</a>
+      <a class="opt2" href="#results">Results</a>
+      <a class="opt" href="#notes">Engineering notes</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/agirishkumar/CudaOCR">GitHub</a>
+    </nav>
+    <button class="theme-toggle" id="theme" type="button" aria-label="Toggle colour theme">◐</button>
+  </div>
+</header>
+
+<main>
+<div class="wrap hero">
+  <h1>OCR for printed documents,<br>with the image work on the GPU.</h1>
+  <p class="lede">CudaOCR turns scans, photos of pages and scanned PDFs into text, JSON or hOCR.
+    Cleaning, binarization, deskew and line detection are hand-written CUDA kernels, each checked
+    against a CPU reference implementation. Recognition runs the PP-OCRv5 English model through ONNX Runtime.</p>
+  <div class="cta">
+    <a class="btn primary" href="#install">Install</a>
+    <a class="btn" href="https://github.com/agirishkumar/CudaOCR">Source on GitHub</a>
+    <a class="btn" href="https://github.com/agirishkumar/CudaOCR/blob/main/docs/architecture.md">Architecture</a>
+  </div>
+  <pre><span class="c"># one command, any number of pages; one model load for all of them</span>
+cudaocr scan.pdf -o out/            <span class="c"># out/scan-p001.txt, out/scan-p002.txt, …</span>
+cudaocr page.png -o page.json       <span class="c"># lines and words with boxes and confidences</span></pre>
+  <div class="facts">
+    <div class="fact"><b>≈ 3 ms</b><span>GPU cleanup, deskew and line detection, dense page</span></div>
+    <div class="fact"><b>0.21 %</b><span>character error rate, 50 synthetic pages</span></div>
+    <div class="fact"><b>~200</b><span>tests, every kernel against a CPU oracle</span></div>
+    <div class="fact"><b>sm_75–120</b><span>Turing to Blackwell, one package</span></div>
+  </div>
+</div>
+
+<section id="pipeline">
+  <div class="wrap">
+    <h2>What happens to a page</h2>
+    <p class="sub">A typewritten page on crumpled paper, through each stage. These are the
+      images <code>--dump-stages</code> writes, and the text is the program's actual output.</p>
+
+    <div class="stage-tabs" role="tablist" aria-label="Pipeline stages">
+      <button role="tab" aria-selected="true" data-stage="0">1 · Input</button>
+      <button role="tab" aria-selected="false" data-stage="1">2 · Binarize</button>
+      <button role="tab" aria-selected="false" data-stage="2">3 · Lines &amp; words</button>
+      <button role="tab" aria-selected="false" data-stage="3">4 · Line crops</button>
+      <button role="tab" aria-selected="false" data-stage="4">5 · Text</button>
+    </div>
+
+    <div class="stage-view">
+      <div class="frame" id="stage-frame">
+        <img id="stage-img" src="img/crumpled_input.png" width="726" height="341" alt="Typewritten page on crumpled paper">
+        <pre class="ocr-out" id="stage-pre" hidden>There are several classic spatial filters for redu
+frequency noise from images. The mean filter, the med
+opening filter are frequently used. The mean filter i
+filter that replaces the pixel values with the neighbo
+the image noise but blurs the image edges. The median
+of the pizel neighborhood for each pixel, thereby redu
+Finally, the opening closing filter is a mathematical.
+combines the same number of erosion and dilation morph
+to eliminate small objects from images.
+The main goal was to train a neural network in a st
+a clean image from a noisy one. In this particular ca</pre>
+      </div>
+      <div class="stage-text" id="stage-text" aria-live="polite"></div>
+    </div>
+
+    <div class="pair">
+      <div class="card">
+        <h3>Deskew</h3>
+        <p>A Hough transform finds the text angle, and a rotation kernel straightens the page
+          before lines are cut. Only baseline pixels vote: when every ink pixel voted, diagonals
+          through several rows beat the true baselines by up to 3°.</p>
+        <div class="duo">
+          <figure class="frame"><img src="img/skew_binary.png" width="1282" height="712" alt="Page binarized, still rotated by four degrees" loading="lazy"><figcaption>binarized, −4°</figcaption></figure>
+          <figure class="frame"><img src="img/skew_overlay.png" width="1282" height="712" alt="Same page straightened, with line and word boxes" loading="lazy"><figcaption>detected 4.00°, corrected</figcaption></figure>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Light text on dark</h3>
+        <p>Polarity is decided on the grayscale image, which is flipped before binarization.
+          Thresholding light-on-dark text directly leaves halos around every glyph.</p>
+        <div class="duo">
+          <figure class="frame"><img src="img/inverted_input.png" width="1240" height="626" alt="White text on a black page" loading="lazy"><figcaption>input</figcaption></figure>
+          <figure class="frame"><img src="img/inverted_binary.png" width="1240" height="626" alt="The same page binarized as dark text on white" loading="lazy"><figcaption>after polarity + threshold</figcaption></figure>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap">
+    <h2>Results</h2>
+    <p class="sub">Character error rate with default settings. Lower is better. From
+      <code>scripts/accuracy_report.sh --large</code>, and guarded by CER ratchets in the test suite,
+      so a change that makes these worse fails the build.</p>
+
+    <div class="charts">
+      <div class="card">
+        <h3>Accuracy (CER)</h3>
+        <div class="bars" id="cer-bars"></div>
+        <p class="note">* Zoned: each ground-truth text region OCRed on its own (the ISRI protocol).
+          Full page adds our own layout and reading order, which assume a single column. That gap is the main open work.</p>
+      </div>
+      <div class="card">
+        <h3>Where the time goes</h3>
+        <p>Dense 33-line book page, RTX 3060 Laptop, model warm.</p>
+        <div class="split" role="img" aria-label="About 3 milliseconds of GPU preprocessing and layout versus about 370 milliseconds of recognition">
+          <div class="pre"></div><div class="rec"></div>
+        </div>
+        <div class="legend"><span><b>≈ 3 ms</b> custom CUDA: cleanup, deskew, lines</span><span><b>≈ 370 ms</b> recognizer</span></div>
+        <p class="note">The first page in a process adds ≈ 0.5 s of model and cuDNN start-up, so
+          batch mode (many pages, one process) is about 6× faster than one run per page.</p>
+
+        <h3 style="margin-top:24px">Custom kernels vs NVIDIA NPP</h3>
+        <div class="table-scroll">
+        <table>
+          <thead><tr><th>2500×3500 image</th><th class="num">Custom</th><th class="num">NPP</th><th class="num"></th></tr></thead>
+          <tbody>
+            <tr><td>box mean 31×31</td><td class="num">2.44 ms</td><td class="num">19.5 ms</td><td class="num good">8× faster</td></tr>
+            <tr><td>grayscale</td><td class="num">0.137 ms</td><td class="num">0.112 ms</td><td class="num">1.2× NPP</td></tr>
+            <tr><td>Gaussian 5×5</td><td class="num">0.76 ms</td><td class="num">0.29 ms</td><td class="num">2.6× NPP</td></tr>
+            <tr><td>median 5×5</td><td class="num">19.2 ms</td><td class="num">0.72 ms</td><td class="num">27× NPP</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p class="note">The pipeline uses a 3×3 median (0.2 ms). Faster median and Gaussian kernels are on the backlog.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="notes">
+  <div class="wrap">
+    <h2>Engineering notes</h2>
+    <p class="sub">Things that went wrong or turned out differently than expected. Each fixed
+      bug has a named regression test, and each tuning choice is backed by a measured sweep, recorded in the
+      <a href="https://github.com/agirishkumar/CudaOCR/blob/main/docs/decisions.md">decision log</a>.</p>
+    <div class="stories">
+      <article class="story">
+        <span class="tag">Build</span>
+        <h3>Compiled for the wrong GPU for five months</h3>
+        <p>The CUDA architecture default was set after <code>project()</code>, so every build silently
+          targeted sm_75 and the driver JIT-compiled PTX at start-up. Nothing failed until toolkit 13.4
+          produced PTX newer than the 13.2 driver accepts, and 33 of 59 tests broke at once.</p>
+        <p>Fix: set the default before <code>project()</code> and always embed native code for the target GPU.</p>
+        <div class="test">CudaArch.CudaArchMatchesDevice</div>
+      </article>
+      <article class="story">
+        <span class="tag">Concurrency</span>
+        <h3>A race only a refactor could see</h3>
+        <p>Uploads and fills ran on the default stream while the kernels ran on the pipeline's
+          own stream, so a kernel could read a buffer before its upload finished. It turned up
+          while checking that the new component-based pipeline matched the old one, box for box.</p>
+        <p>Fix: every transfer and fill now takes the caller's stream explicitly.</p>
+        <div class="test">StreamOrdering.*</div>
+      </article>
+      <article class="story">
+        <span class="tag">Numerics</span>
+        <h3>TF32 was moving the answers</h3>
+        <p>With ONNX Runtime's defaults, the CUDA recognizer's character probabilities differed from
+          the CPU run by up to 0.065, enough to flip characters. Turning TF32 off brought the
+          difference down to 1.8e-5.</p>
+        <p>Correctness first: TF32 is off by default and can be re-enabled in the config.</p>
+        <div class="test">decision log #24</div>
+      </article>
+      <article class="story">
+        <span class="tag">Memory</span>
+        <h3>A horizontal rule asked for 3.8 GB</h3>
+        <p>A thin ruled line detected as a "text line" has an extreme aspect ratio. Scaled to the
+          recognizer's 48-pixel height, it became a crop wide enough to exhaust a 6 GB card.</p>
+        <p>Fix: a maximum crop width. Degenerate lines are capped instead of failing the page.</p>
+        <div class="test">PlanLineCrops.MaxWidthCapsDegenerateAspectRatios</div>
+      </article>
+      <article class="story">
+        <span class="tag">Tuning</span>
+        <h3>One constant, 23 % → 5 %</h3>
+        <p>The adaptive threshold offset <code>C</code> started at 10. A sweep over the synthetic, large
+          and real-scan sets moved real-scan CER from 23.45 % (C = 10) to 5.01 % (C = 40). C = 60 scored
+          marginally better on clean pages, but a low-contrast test page fell apart (99 % CER), so the default stopped at 40.</p>
+        <div class="test">decision log #25 · Accuracy.* ratchets</div>
+      </article>
+      <article class="story">
+        <span class="tag">Layout</span>
+        <h3>Descenders became their own lines</h3>
+        <p>Row-projection profiles split the tails of g, p and y (and the dots over i) into thin
+          separate "lines". Slivers are now merged into
+          their neighbour, with a test that a genuinely short line between two noise blobs survives.</p>
+        <div class="test">DetectLines.Merges* · DetectLines.DoesNotSwallowShortLineBetweenNoiseBlobs</div>
+      </article>
+      <article class="story">
+        <span class="tag">Tuning</span>
+        <h3>How much margin a line crop needs</h3>
+        <p>Each line box is padded before it is resized to 48 px. On the synthetic pages, CER was
+          0.37 % with no padding and 0.25 % with 10 %. At 30 % the crops pulled in neighbouring lines, and the
+          skewed page reached 54 % CER.</p>
+        <div class="test">decision log #23</div>
+      </article>
+      <article class="story">
+        <span class="tag">Shipping</span>
+        <h3>Works in the build tree, not once installed</h3>
+        <p>The installed binary couldn't find ONNX Runtime or the model. The install now carries both,
+          with an <code>$ORIGIN</code>-relative library path. The CUDA runtime is linked statically,
+          so the binary starts with only the NVIDIA driver present.</p>
+        <div class="test">Install.SelfContained · Release.VersionAndRuntime</div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="limits">
+  <div class="wrap">
+    <h2>Known limitations</h2>
+    <p class="sub">The scope is printed, mostly single-column pages. It is meant to be a functional,
+      modular OCR engine, not a state-of-the-art competitor.</p>
+    <div class="limits">
+      <ul>
+        <li><b>Multi-column pages, tables and figures.</b> Layout reads one column from top to bottom:
+          19.6 % CER on full UNLV pages, against 6.8 % when the text regions are given.</li>
+        <li><b>Heavy stains.</b> Large blots binarize as ink and are read as characters. The
+          coffee-stained sample is at ≈ 30 % CER.</li>
+        <li><b>Throughput.</b> About 0.3–0.4 s per dense page, almost all of it in the recognizer.</li>
+        <li><b>Script.</b> English/Latin only (the model's 436-character dictionary). No handwriting or scene text.</li>
+      </ul>
+      <div class="duo">
+        <figure class="frame"><img src="img/stained_input.png" width="727" height="343" alt="Text page with dark coffee stains" loading="lazy"><figcaption>coffee-stained scan</figcaption></figure>
+        <figure class="frame"><img src="img/stained_binary.png" width="727" height="343" alt="Binarized version where the stain edges survive as dark blobs" loading="lazy"><figcaption>stain edges survive binarization</figcaption></figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <h2>Install</h2>
+    <p class="sub">Linux x86-64 with an NVIDIA GPU (Turing or newer) and a CUDA 13 driver.</p>
+    <div class="qs">
+      <div class="card">
+        <h3>Debian package</h3>
+        <p>Ubuntu 24.04 or 26.04. Download the matching <code>.deb</code> from the
+          <a href="https://github.com/agirishkumar/CudaOCR/releases">releases page</a>. It includes ONNX Runtime and the model.</p>
+<pre>sudo apt install ./cudaocr_0.1.0-1~ubuntu24.04_amd64.deb
+<span class="c"># for GPU recognition</span>
+sudo apt install cuda-libraries-13-4 cudnn9-cuda-13</pre>
+        <p style="margin-top:12px">Without the CUDA libraries everything still runs, and <code>--ep cpu</code> recognizes on the CPU.</p>
+      </div>
+      <div class="card">
+        <h3>Docker</h3>
+        <p>Needs the NVIDIA Container Toolkit. The image includes CUDA, cuDNN and the model.</p>
+<pre>docker build -t cudaocr .
+docker run --rm --gpus all \
+  -v "$PWD":/data cudaocr scan.pdf -o out/</pre>
+      </div>
+      <div class="card">
+        <h3>From source</h3>
+        <p>CUDA Toolkit 13.x, CMake ≥ 3.24, a C++20 compiler; optional <code>libpoppler-cpp-dev</code> for PDFs.</p>
+<pre>cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+./scripts/fetch_models.sh
+./build/cudaocr page.png</pre>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>CudaOCR is MIT-licensed. ONNX Runtime (MIT), the PP-OCRv5 model (Apache-2.0) and poppler (GPL-2.0-or-later):
+      see <a href="https://github.com/agirishkumar/CudaOCR/blob/main/THIRD_PARTY_NOTICES.md">third-party notices</a>.</p>
+    <p>The crumpled and coffee-stained pages appear to derive from the NoisyOffice corpus (España-Boquera, Pastor-Pellicer,
+      Castro-Bleda, Zamora-Martínez; UCI Machine Learning Repository,
+      <a href="https://doi.org/10.24432/C5G31N">doi:10.24432/C5G31N</a>), CC BY 4.0, and were resized. The skewed and inverted pages are
+      synthetic test fixtures generated by the project.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var stages = [
+    { img: "img/crumpled_input.png", w: 726, h: 341, alt: "Typewritten page on crumpled paper",
+      title: "Input",
+      body: "A 727×343 typewritten page on crumpled paper. On the GPU, the page is converted to grayscale, " +
+            "and a 3×3 median filter removes speckle while keeping stroke edges.",
+      kernel: "stages/grayscale.cu · stages/filters.cu" },
+    { img: "img/crumpled_binary.png", w: 726, h: 341, alt: "Black-and-white version of the page with the creases removed",
+      title: "Binarize",
+      body: "Adaptive thresholding compares each pixel to the mean of its 31×31 neighbourhood. A box-filter " +
+            "kernel computes that mean, 8× faster than NPP. A pixel counts as ink only if it is at least 40 " +
+            "levels darker than that local mean, so the gradual shading of the creases drops out.",
+      kernel: "stages/binarize.cu · polarity check runs first" },
+    { img: "img/crumpled_overlay.png", w: 726, h: 341, alt: "The binarized page with blue line boxes and red word boxes",
+      title: "Lines & words",
+      body: "Hough voting on baseline pixels estimates the skew (0° here). Row-projection profiles then " +
+            "cut the page into lines (blue), and column gaps split each line into words (red). Slivers " +
+            "such as descenders and i-dots are merged back into their line.",
+      kernel: "stages/deskew.cu · stages/segment.cu" },
+    { img: "img/crumpled_crops.png", w: 1414, h: 160, alt: "The first three lines cropped and scaled to 48 pixels high",
+      title: "Line crops",
+      body: "Each line box is padded by 10 % of its height and resampled to 48 px high on the GPU. " +
+            "Crops are sorted by width and batched, and the batch stays in GPU memory when it is handed " +
+            "to ONNX Runtime. (Illustration: the first three lines.)",
+      kernel: "stages/line_prep.cu" },
+    { pre: true,
+      title: "Text",
+      body: "PP-OCRv5 outputs per-timestep character probabilities, and greedy CTC decoding turns them into " +
+            "text. The timesteps also give word positions, so JSON and hOCR outputs carry word boxes and " +
+            "confidences. CER on this page: 0.69 %. Lines end mid-word because the scan is cropped, and “pizel” is a real misread.",
+      kernel: "components/onnx_line_recognizer.cpp · ctc_greedy_decoder.cpp" }
+  ];
+  var tabs = document.querySelectorAll(".stage-tabs button");
+  var img = document.getElementById("stage-img");
+  var pre = document.getElementById("stage-pre");
+  var text = document.getElementById("stage-text");
+  function show(i) {
+    var s = stages[i];
+    tabs.forEach(function (t, j) { t.setAttribute("aria-selected", j === i ? "true" : "false"); });
+    if (s.pre) { img.hidden = true; pre.hidden = false; }
+    else {
+      pre.hidden = true; img.hidden = false;
+      img.src = s.img; img.width = s.w; img.height = s.h; img.alt = s.alt;
+    }
+    text.innerHTML = "";
+    var h = document.createElement("h3"); h.textContent = s.title;
+    var p = document.createElement("p"); p.textContent = s.body;
+    var k = document.createElement("div"); k.className = "kernel"; k.textContent = s.kernel;
+    text.append(h, p, k);
+  }
+  tabs.forEach(function (t, i) { t.addEventListener("click", function () { show(i); }); });
+  show(0);
+  stages.forEach(function (s) { if (s.img) { var pre = new Image(); pre.src = s.img; } });
+
+  var cer = [
+    ["Synthetic pages (clean, skewed, noisy, inverted) · 50", 0.21],
+    ["Clean typeset book page · 1", 0.94],
+    ["Real sample scans (book, stained, crumpled) · 3", 4.75],
+    ["UNLV/ISRI letters and reports, zoned* · 40", 6.84],
+    ["UNLV/ISRI, full page · 40", 19.64, true]
+  ];
+  var max = 20, box = document.getElementById("cer-bars");
+  cer.forEach(function (r) {
+    var row = document.createElement("div"); row.className = "bar-row";
+    row.innerHTML = '<span class="label"></span><div class="track"><div class="fill"></div></div><span class="val"></span>';
+    row.querySelector(".label").textContent = r[0];
+    var f = row.querySelector(".fill");
+    f.style.width = Math.max(1, r[1] / max * 100) + "%";
+    if (r[2]) f.classList.add("alt");
+    row.querySelector(".val").textContent = r[1].toFixed(2) + " %";
+    box.appendChild(row);
+  });
+
+  var root = document.documentElement, btn = document.getElementById("theme");
+  try { var saved = localStorage.getItem("theme"); if (saved) root.setAttribute("data-theme", saved); } catch (e) {}
+  btn.addEventListener("click", function () {
+    var dark = root.getAttribute("data-theme") === "dark" ||
+      (!root.hasAttribute("data-theme") && matchMedia("(prefers-color-scheme: dark)").matches);
+    var next = dark ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("theme", next); } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>
