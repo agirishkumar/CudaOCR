@@ -51,7 +51,8 @@ std::string OnnxLineRecognizer::defaultModelDir() {
 }
 
 Result<std::unique_ptr<OnnxLineRecognizer>> OnnxLineRecognizer::create(const Params& p) {
-    Status s = p.requireKnown({"model", "dict", "ep", "maxBatch", "padFrac", "tf32"}, "onnx");
+    Status s =
+        p.requireKnown({"model", "dict", "ep", "maxBatch", "padFrac", "tf32", "maxWidth"}, "onnx");
     if (!s.ok()) return s;
     const std::string dir = defaultModelDir();
     auto model = p.get<std::string>("model", dir + "/rec.onnx");
@@ -59,8 +60,9 @@ Result<std::unique_ptr<OnnxLineRecognizer>> OnnxLineRecognizer::create(const Par
     auto maxBatch = p.get<int>("maxBatch", 16);
     auto padFrac = p.get<float>("padFrac", 0.1f);
     auto tf32 = p.get<bool>("tf32", false);
-    for (const Status* st :
-         {&model.status(), &ep.status(), &maxBatch.status(), &padFrac.status(), &tf32.status()})
+    auto maxWidth = p.get<int>("maxWidth", LinePrepParams{}.maxWidth);
+    for (const Status* st : {&model.status(), &ep.status(), &maxBatch.status(), &padFrac.status(),
+                             &tf32.status(), &maxWidth.status()})
         if (!st->ok()) return *st;
     const std::string dictDefault =
         (std::filesystem::path(model.value()).parent_path() / "dict.txt").string();
@@ -70,6 +72,7 @@ Result<std::unique_ptr<OnnxLineRecognizer>> OnnxLineRecognizer::create(const Par
         return invalid("ep must be cuda or cpu, got '" + ep.value() + "'");
     if (maxBatch.value() < 1) return invalid("maxBatch must be >= 1");
     if (padFrac.value() < 0) return invalid("padFrac must be >= 0");
+    if (maxWidth.value() < 0) return invalid("maxWidth must be >= 0 (0 = no cap)");
     if (!std::filesystem::exists(model.value()))
         return Status::Error(ErrorCode::IoError,
                              "onnx: model not found: " + model.value() +
@@ -79,6 +82,7 @@ Result<std::unique_ptr<OnnxLineRecognizer>> OnnxLineRecognizer::create(const Par
     impl->cuda = ep.value() == "cuda";
     impl->maxBatch = maxBatch.value();
     impl->prep.padFrac = padFrac.value();
+    impl->prep.maxWidth = maxWidth.value();
     auto cs = loadCtcCharset(dict.value());
     if (!cs.ok()) return cs.status();
     impl->charset = cs.take();

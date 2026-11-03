@@ -1,11 +1,14 @@
 // cudaocr-eval: score OCR output against ground truth.
 //
 //   cudaocr-eval <pred_dir> <gt_dir> [--gt-ext .gt.txt] [--pred-ext .txt] [--max-cer X]
+//                [--ref-wildcard C]
 //
 // For every <name><gt-ext> in gt_dir, reads <name><pred-ext> from pred_dir (a
 // missing prediction counts as empty output) and prints a markdown table of
 // per-file and aggregate CER/WER. Aggregates are total edits / total reference
 // length. With --max-cer, exits 1 if the aggregate CER exceeds X (0..1).
+// --ref-wildcard C: reference character C matches any one output character
+// (UNLV ground truth uses '~' for undeterminable characters).
 
 #include <algorithm>
 #include <cstdio>
@@ -50,7 +53,7 @@ std::string frac(const ErrorCounts& e) {
 int usage() {
     std::fprintf(stderr,
                  "usage: cudaocr-eval <pred_dir> <gt_dir> [--gt-ext .gt.txt] [--pred-ext .txt] "
-                 "[--max-cer X]\n");
+                 "[--max-cer X] [--ref-wildcard C]\n");
     return 2;
 }
 
@@ -60,10 +63,16 @@ int main(int argc, char** argv) {
     std::vector<std::string> pos;
     std::string gtExt = ".gt.txt", predExt = ".txt";
     double maxCer = -1;
+    char32_t wildcard = 0;
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
         auto next = [&]() -> const char* { return i + 1 < argc ? argv[++i] : nullptr; };
-        if (a == "--gt-ext" || a == "--pred-ext" || a == "--max-cer") {
+        if (a == "--ref-wildcard") {
+            const char* v = next();
+            const std::u32string w = v ? cudaocr::eval::utf8Decode(v) : std::u32string{};
+            if (w.size() != 1) return usage();
+            wildcard = w[0];
+        } else if (a == "--gt-ext" || a == "--pred-ext" || a == "--max-cer") {
             const char* v = next();
             if (!v) return usage();
             if (a == "--gt-ext")
@@ -116,8 +125,8 @@ int main(int argc, char** argv) {
         }
         const bool found = readFile(predDir / (name + predExt), hyp);
         if (!found) ++missing;
-        const ErrorCounts c = cudaocr::eval::charErrors(ref, hyp);
-        const ErrorCounts w = cudaocr::eval::wordErrors(ref, hyp);
+        const ErrorCounts c = cudaocr::eval::charErrors(ref, hyp, wildcard);
+        const ErrorCounts w = cudaocr::eval::wordErrors(ref, hyp, wildcard);
         chars += c;
         words += w;
         std::printf("| %s | %s | %s | %s | %s | %s |\n", name.c_str(), pct(c).c_str(),

@@ -57,7 +57,8 @@ Status invalid(const std::string& msg) {
 Result<std::vector<LineCrop>> planLineCrops(std::span<const BBox> boxes, int pageW, int pageH,
                                             const LinePrepParams& p) {
     if (pageW <= 0 || pageH <= 0) return invalid("empty page");
-    if (p.height <= 0 || p.minWidth <= 0 || p.channels <= 0 || p.padFrac < 0 || p.scale == 0)
+    if (p.height <= 0 || p.minWidth <= 0 || p.channels <= 0 || p.padFrac < 0 || p.scale == 0 ||
+        (p.maxWidth != 0 && p.maxWidth < p.minWidth))
         return invalid("bad parameters");
     std::vector<LineCrop> crops;
     crops.reserve(boxes.size());
@@ -74,6 +75,7 @@ Result<std::vector<LineCrop>> planLineCrops(std::span<const BBox> boxes, int pag
         c.h = b.height() + 2 * pad;
         c.outW = std::max(p.minWidth,
                           static_cast<int>(std::lround(static_cast<double>(c.w) * p.height / c.h)));
+        if (p.maxWidth > 0) c.outW = std::min(c.outW, p.maxWidth);
         crops.push_back(c);
     }
     return crops;

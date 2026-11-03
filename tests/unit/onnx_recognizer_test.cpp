@@ -139,6 +139,27 @@ TEST(OnnxRecognizer, CharsetIsBlankDictSpace) {
     EXPECT_EQ(cs.symbols.back(), " ");
 }
 
+// Regression (M4.6): a 2500 x 4 px rule detected as a line made the recognizer
+// request gigabytes of GPU memory. With the width cap it costs at most 768
+// timesteps and the call succeeds.
+TEST(OnnxRecognizer, DegenerateThinLineIsCappedNotFatal) {
+    REQUIRE_MODEL();
+    auto rec = make("cuda");
+    ASSERT_TRUE(rec);
+    HostImage page = HostImage::create(2560, 400, 1, 255);
+    for (int y = 100; y < 104; ++y)
+        for (int x = 0; x < 2500; ++x) page.at(x, y) = 0;
+    LineResult rule;
+    rule.box = {0, 100, 2499, 103};
+    auto d = DeviceImage::fromHost(page);
+    ASSERT_TRUE(d.ok());
+    StageContext ctx;
+    auto r = rec->recognize(d.value(), std::vector<LineResult>{rule}, ctx);
+    ASSERT_TRUE(r.ok()) << r.status().message;
+    ASSERT_EQ(r.value().size(), 1u);
+    EXPECT_LE(r.value()[0].timesteps(), 6144 / 8);
+}
+
 TEST(OnnxRecognizer, NoLinesNoWork) {
     REQUIRE_MODEL();
     auto rec = make("cpu");
