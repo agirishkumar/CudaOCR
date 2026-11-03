@@ -4,7 +4,8 @@
 // models/README.md) through ONNX Runtime. ORT headers stay in the .cpp.
 //
 // Params (defaults):
-//   model     path to rec.onnx   ($CUDAOCR_MODEL_DIR or the build's models/ dir)
+//   model     path to rec.onnx   ($CUDAOCR_MODEL_DIR, the install's share/cudaocr/
+//             models, or the source tree's models/ — see defaultModelDir())
 //   dict      path to dict.txt   (same directory as the default model)
 //   ep        cuda | cpu         (cuda)
 //   maxBatch  lines per ORT run, >= 1 (16); lines are sorted by width first to
@@ -36,7 +37,8 @@ class OnnxLineRecognizer final : public LineRecognizer {
                                             std::span<const LineResult> lines,
                                             StageContext& ctx) override;
 
-    // $CUDAOCR_MODEL_DIR if set, else the source tree's models/ directory.
+    // $CUDAOCR_MODEL_DIR if set; else <prefix>/share/cudaocr/models next to an
+    // installed binary when it holds rec.onnx; else the source tree's models/.
     static std::string defaultModelDir();
 
   private:
