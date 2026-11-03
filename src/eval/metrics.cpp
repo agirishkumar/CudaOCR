@@ -74,18 +74,28 @@ std::string normalizeWhitespace(std::string_view s) {
     return out;
 }
 
-ErrorCounts charErrors(std::string_view reference, std::string_view hypothesis) {
+ErrorCounts charErrors(std::string_view reference, std::string_view hypothesis,
+                       char32_t refWildcard) {
     const std::u32string ref = utf8Decode(normalizeWhitespace(reference));
     const std::u32string hyp = utf8Decode(normalizeWhitespace(hypothesis));
-    return {editDistance(ref, hyp), ref.size()};
+    auto same = [&](char32_t r, char32_t h) { return r == h || (refWildcard && r == refWildcard); };
+    return {editDistance(ref, hyp, same), ref.size()};
 }
 
-ErrorCounts wordErrors(std::string_view reference, std::string_view hypothesis) {
+ErrorCounts wordErrors(std::string_view reference, std::string_view hypothesis,
+                       char32_t refWildcard) {
     const std::string refNorm = normalizeWhitespace(reference);
     const std::string hypNorm = normalizeWhitespace(hypothesis);
-    const auto ref = splitWords(refNorm);
-    const auto hyp = splitWords(hypNorm);
-    return {editDistance(ref, hyp), ref.size()};
+    std::vector<std::u32string> ref, hyp;
+    for (auto w : splitWords(refNorm)) ref.push_back(utf8Decode(w));
+    for (auto w : splitWords(hypNorm)) hyp.push_back(utf8Decode(w));
+    auto same = [&](const std::u32string& r, const std::u32string& h) {
+        if (r.size() != h.size()) return false;
+        for (size_t i = 0; i < r.size(); ++i)
+            if (r[i] != h[i] && !(refWildcard && r[i] == refWildcard)) return false;
+        return true;
+    };
+    return {editDistance(ref, hyp, same), ref.size()};
 }
 
 }  // namespace cudaocr::eval

@@ -90,6 +90,22 @@ for thresholding/deskew options.
 Example on `resources/sample.png` (699x921 scan, RTX 3060 Laptop):
 35 lines, 348 words, 903 characters in **~3 ms** of GPU pipeline time (`--benchmark`).
 
+## Accuracy
+
+Character / word error rate (lower is better) from `scripts/accuracy_report.sh --large`
+(details: [benchmarks/ACCURACY.md](benchmarks/ACCURACY.md)), RTX 3060 Laptop, default settings:
+
+| Test set | Pages | CER | WER |
+|---|---:|---:|---:|
+| Synthetic pages (clean, skewed, noisy, inverted; generated) | 50 | 0.21 % | 1.00 % |
+| Real scans in `resources/` (incl. stained/noisy) | 4 | 5.01 % | 9.77 % |
+| UNLV/ISRI business letters + DOE reports, 300 dpi — zoned* | 40 | 6.84 % | 15.10 % |
+| UNLV/ISRI, same pages — full page, our own layout | 40 | 19.64 % | 29.94 % |
+
+\*Zoned = each ground-truth text zone OCRed separately (the ISRI protocol); full page adds
+our projection-profile layout and reading order, which assumes a single column — the gap is
+the layout work in M6. UNLV data: `scripts/fetch_unlv.sh` (43 MB, not redistributable).
+
 ## Benchmarks (`./build/bench`, 2500x3500, RTX 3060 Laptop, vs NPP)
 
 | kernel | custom | NPP | ratio |

@@ -5,7 +5,10 @@
 #   scripts/accuracy_report.sh [--large] [--out FILE] [-- extra cudaocr flags]
 #
 # Sets: synth-ci (tests/fixtures/synth), real (resources/ + tests/fixtures/real),
-# and with --large a 50-page synthetic set generated on the fly (not committed).
+# with --large a 50-page synthetic set generated on the fly (not committed), and,
+# when scripts/fetch_unlv.sh has been run, unlv-zoned (each ground-truth zone
+# OCRed separately, joined in zone order) and unlv-page (whole page, our own
+# layout). UNLV scoring treats the ground truth's '~' as a one-character wildcard.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD="${BUILD:-$ROOT/build}"
@@ -25,24 +28,48 @@ done
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-# run_set <name> <image_dir> <gt_dir>: OCR every <stem>.png that has <stem>.gt.txt.
+# score <name> <pred_dir> <gt_dir> [eval flags]: append per-file + summary rows.
+score() {
+    local name="$1" pred="$2" gts="$3"
+    shift 3
+    {
+        echo "### $name"
+        echo
+        "$BUILD/cudaocr-eval" "$pred" "$gts" "$@"
+        echo
+    } >>"$TMP/report.md"
+    "$BUILD/cudaocr-eval" "$pred" "$gts" "$@" | tail -1 | awk -F'|' -v n="$name" \
+        '{gsub(/\*/, "", $3); gsub(/\*/, "", $5); printf "| %s |%s|%s|%s|%s|\n", n, $3, $4, $5, $6}' \
+        >>"$TMP/summary.md"
+}
+
+# run_set <name> <image_dir> <gt_dir> [eval flags]: OCR every <stem>.png that has
+# <stem>.gt.txt, in one invocation.
 run_set() {
     local name="$1" imgs="$2" gts="$3" pred="$TMP/$1"
+    shift 3
     mkdir -p "$pred"
     local images=()
     for gt in "$gts"/*.gt.txt; do images+=("$imgs/$(basename "$gt" .gt.txt).png"); done
     # One invocation (one model load) per set. Exit 3 (a page without text) is a
     # valid outcome; it scores as all deletions.
     "$BUILD/cudaocr" "${images[@]}" -o "$pred/" "${EXTRA[@]}" 2>/dev/null || [ $? -eq 3 ]
-    {
-        echo "### $name"
-        echo
-        "$BUILD/cudaocr-eval" "$pred" "$gts"
-        echo
-    } >>"$TMP/report.md"
-    "$BUILD/cudaocr-eval" "$pred" "$gts" | tail -1 | awk -F'|' -v n="$name" \
-        '{gsub(/\*/, "", $3); gsub(/\*/, "", $5); printf "| %s |%s|%s|%s|%s|\n", n, $3, $4, $5, $6}' \
-        >>"$TMP/summary.md"
+    score "$name" "$pred" "$gts" "$@"
+}
+
+# UNLV zoned: OCR every zone crop in one run, then join each page's zones in order.
+run_unlv_zoned() {
+    local z="$ROOT/data/unlv/zones" pred="$TMP/unlv-zoned" zpred="$TMP/unlv-zones"
+    mkdir -p "$pred"
+    "$BUILD/cudaocr" "$z" -o "$zpred/" "${EXTRA[@]}" 2>/dev/null || [ $? -eq 3 ]
+    for list in "$z"/*.zones; do
+        local page; page="$(basename "$list" .zones)"
+        : >"$pred/$page.txt"
+        while read -r stem; do
+            [ -n "$stem" ] && [ -f "$zpred/$stem.txt" ] && cat "$zpred/$stem.txt" >>"$pred/$page.txt"
+        done <"$list"
+    done
+    score unlv-zoned "$pred" "$ROOT/data/unlv/page" --ref-wildcard '~'
 }
 
 run_set synth-ci "$ROOT/tests/fixtures/synth" "$ROOT/tests/fixtures/synth"
@@ -50,6 +77,10 @@ run_set real "$ROOT/resources" "$ROOT/tests/fixtures/real"
 if [ $LARGE -eq 1 ]; then
     python3 "$ROOT/scripts/gen_fixtures.py" --out "$TMP/large" --set large >/dev/null
     run_set synth-large "$TMP/large" "$TMP/large"
+fi
+if [ -d "$ROOT/data/unlv/page" ]; then
+    run_unlv_zoned
+    run_set unlv-page "$ROOT/data/unlv/page" "$ROOT/data/unlv/page" --ref-wildcard '~'
 fi
 
 {
@@ -59,7 +90,9 @@ fi
          "on $(date -u +%Y-%m-%d), commit \`$(git -C "$ROOT" rev-parse --short HEAD)\`," \
          "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)."
     echo "CLI flags: \`${EXTRA[*]:-(defaults)}\`. CER/WER = Levenshtein edits / reference length"
-    echo "after whitespace normalization (\`cudaocr-eval\`)."
+    echo "after whitespace normalization (\`cudaocr-eval\`). unlv-* rows: $(cat "$ROOT/data/unlv/sample.txt" 2>/dev/null || echo "not fetched")"
+    echo "of the UNLV/ISRI bus.3B + doe3.3B 300 dpi scans (\`scripts/fetch_unlv.sh\`; data not redistributable),"
+    echo "'~' in their ground truth scored as a one-character wildcard."
     echo
     echo "| set | CER | char edits/ref | WER | word edits/ref |"
     echo "|---|---:|---:|---:|---:|"

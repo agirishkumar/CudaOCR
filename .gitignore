@@ -10,6 +10,9 @@ __pycache__/
 *.pyc
 .venv/
 
+# Fetched evaluation data (scripts/fetch_unlv.sh; licence forbids redistribution)
+/data/
+
 # Fetched model weights (scripts/fetch_models.sh, M3.5); the model card is tracked
 /models/*
 !/models/README.md

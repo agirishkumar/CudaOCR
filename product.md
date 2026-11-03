@@ -61,6 +61,7 @@ Priorities, in order:
 8. ~~**Default thresholding is weak on noisy scans**~~ *Mostly fixed in M3.11* (adaptive C 10 → 40, decision #25): noisy synthetic pages 99 % → ≤ 0.8 % CER, `noisy_text2` 98 % → 0.7 %, real-scan aggregate 23.5 % → 5.0 %. Remaining: coffee-stained `noisy_text` 30 %, speckled `vigorous-before` → M6.8 (`noisy_text2.png`: 2 lines with defaults vs 9 with `--otsu`). Backlog M3.11.
 9. ~~**Descender slivers split into separate lines.**~~ *Fixed in M3.1.* Below the baseline only a few descender strokes carry ink, so the row count dipped under the ink threshold and descender bottoms became 5–6 px "lines" (10 lines on an 8-line page). `detectLines` now merges slivers (< 1/3 typical height, within 1/3 line) into the adjacent line. Regression tests: `DetectLines.Merges*`, `DetectLines.DoesNotSwallowShortLineBetweenNoiseBlobs`.
 10. ~~**Exit-time heap corruption with the CUDA EP.**~~ *Fixed in M3.10:* a static `Ort::Env` destroyed during static destruction (after the CUDA EP) intermittently aborted the process (~15 % of runs of the CUDA smoke test). ORT Env/Session singletons are now process-lifetime (never destroyed). Regression: `Ort.ExitIsClean` (25 fresh processes).
+11. ~~**Thin rules exhausted GPU memory.**~~ *Fixed in M4.6:* on UNLV pages, 3–6 px horizontal rules were detected as lines, resized to ~30,000 px wide, and the recognizer's O(T²) attention asked ONNX Runtime for up to 3.8 GB, failing 7/40 pages. `LinePrepParams::maxWidth` (6144, also the `onnx` `maxWidth` param) caps it. Regressions: `PlanLineCrops.MaxWidthCapsDegenerateAspectRatios`, `OnnxRecognizer.DegenerateThinLineIsCappedNotFatal`.
 
 ## 5. Full product specification (features by pipeline stage)
 
@@ -151,7 +152,7 @@ Detailed, machine-checkable tasks live in [BACKLOG.md](BACKLOG.md).
 |---|---|---|
 | **Synthetic (generated in-repo)** | `scripts/gen_fixtures.py` renders known text with system fonts (DejaVu, Liberation) via Pillow; optional skew, noise, blur, inversion, DPI | Primary TDD/CER fixtures: exact ground truth, deterministic seeds, no licensing issues. Small set committed; larger set generated on demand. |
 | `resources/` scans | 5 existing real images, no ground truth | Smoke tests ("produces non-empty readable text"); hand-transcribe 1–2 pages for a real-scan CER number |
-| **UNLV / ISRI dataset** | ~2,900 scanned printed pages (magazines, letters, reports) with ground-truth text; the set Tesseract was historically evaluated on | Real-scan accuracy in M4; use a 20–50 page subset, not committed |
+| **UNLV / ISRI dataset** | ~2,900 scanned printed pages (magazines, letters, reports) with ground-truth text; the set Tesseract was historically evaluated on | **In use (M4.6):** `scripts/fetch_unlv.sh` → 40-page seeded sample of bus.3B + doe3.3B (300 dpi bitonal); © UNLV, not redistributable — never committed |
 | FUNSD | 199 scanned forms with word boxes + text | Detection/word-box sanity on noisy scans (M4/M6) |
 | PubLayNet / DocLayNet | Layout annotations | Only if/when multi-column layout (M6) is attempted |
 

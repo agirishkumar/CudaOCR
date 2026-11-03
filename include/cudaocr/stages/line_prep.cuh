@@ -20,8 +20,12 @@ struct LinePrepParams {
     float padFrac = 0.1f;  // padding on every side, as a fraction of the box height
                            // (0.10 measured best: see architecture.md decision #23)
     int minWidth = 8;      // model needs >= 8 px (one CTC timestep per 8 px)
-    int channels = 3;      // gray replicated into this many planes
-    float mean = 0.5f;     // x = (v / 255 - mean) / scale
+    // Cap on the resized width (0 = none); wider lines are squeezed. Real full-width
+    // text lines resize to ~3000-4400 px; thin rules detected as lines reached
+    // ~30000 px and made the recognizer's attention run out of GPU memory (M4.6).
+    int maxWidth = 6144;
+    int channels = 3;   // gray replicated into this many planes
+    float mean = 0.5f;  // x = (v / 255 - mean) / scale
     float scale = 0.5f;
 };
 
@@ -30,7 +34,7 @@ struct LinePrepParams {
 struct LineCrop {
     int x0, y0;  // crop origin in page pixels (may be negative: padding off-page)
     int w, h;    // crop size (>= 1)
-    int outW;    // resized width = max(minWidth, round(w * height / h))
+    int outW;    // resized width = clamp(round(w * height / h), minWidth, maxWidth)
 };
 
 // InvalidArgument for empty/inverted boxes, boxes entirely off the page, or bad params.
