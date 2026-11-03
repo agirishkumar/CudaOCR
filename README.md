@@ -30,6 +30,9 @@ image ─► grayscale ─► median denoise ─► polarity normalize ─► ad
 - CMake >= 3.24, a C++20 host compiler (developed with g++ 13 and 15)
 - No other system dependencies: image I/O is vendored (stb), GoogleTest is
   fetched at configure time.
+- PDF input (optional): `sudo apt install libpoppler-cpp-dev` before configuring; without
+  it the build still works and PDF inputs report "built without PDF support"
+  (`-DCUDAOCR_WITH_PDF=OFF` silences the configure warning).
 - ONNX Runtime 1.31.1 (CUDA 13 build, ~233 MB, SHA-256 pinned) is downloaded at
   configure time for the recognizer. Its CUDA execution provider needs cuDNN 9 for
   CUDA 13 (`sudo apt install cudnn9-cuda-13`). Options:
@@ -54,6 +57,7 @@ ctest --test-dir build --output-on-failure   # 60 tests, all GPU kernels vs CPU 
 ./build/cudaocr page.png -v --benchmark --dump-stages stages/   # diagnostics on stderr
 ./build/cudaocr page.png --no-recognize -o boxes.json           # detection only, no model
 ./build/cudaocr scans/ more.png -o out/ --format json           # many pages, one model load
+./build/cudaocr scan.pdf -o out/                                # PDF: out/scan-p001.txt, ...
 ```
 
 Several images or directories are processed by one pipeline (one model load, ~6x faster
