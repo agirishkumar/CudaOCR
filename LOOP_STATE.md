@@ -1,9 +1,9 @@
 # LOOP_STATE — machine state for /engineer-step iterations
 
-Active milestone: M4 (M4.5 deferred by user; next after M4.6: M4.7 PDF input)
+Active milestone: M4 (M4.5 deferred; M4.6, M4.7 done) — next: user to choose (M6 items or M5)
 
 CURRENT: (none)
-branch: task/M4.6-real-scans
+branch: task/M4.7-pdf-input
 pr: (none)
 attempts: 0
 lastFailure: (none)
@@ -35,10 +35,11 @@ lastFailure: (none)
 - M4.2, 2026-11-02, "output: hOCR formatter (M4.2)"
 - M4.3, 2026-11-02, "config: TOML pipeline config, --config/--print-config (M4.3)"
 - M4.4, 2026-11-02, "cli: multi-page input with one pipeline per run (M4.4)" — PR #15 merged
-- M4.6, 2026-11-02, "benchmarks: UNLV/ISRI real-scan accuracy; cap line width (M4.6)"
+- M4.6, 2026-11-02, "benchmarks: UNLV/ISRI real-scan accuracy; cap line width (M4.6)" — PR #16 merged
+- M4.7, 2026-11-02, "input: native PDF pages via poppler-cpp (M4.7)"
 
 ## AWAITING-MERGE
-- PR #16 https://github.com/agirishkumar/CudaOCR/pull/16 (task/M4.6-real-scans)
+(none)
 
 ## BLOCKED
 (none)
