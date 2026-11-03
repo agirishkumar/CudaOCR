@@ -101,6 +101,25 @@ FetchContent_MakeAvailable(tomlplusplus)
 target_sources(cudaocr_lib PRIVATE src/config.cpp)
 target_include_directories(cudaocr_lib SYSTEM PRIVATE ${tomlplusplus_SOURCE_DIR}/include)
 
+# PDF input via poppler-cpp (system package libpoppler-cpp-dev), optional: without
+# it PdfDocument reports PDF input as unsupported.
+option(CUDAOCR_WITH_PDF "Read PDF input with poppler-cpp" ON)
+target_sources(cudaocr_lib PRIVATE src/core/pdf.cpp)
+if(CUDAOCR_WITH_PDF)
+  find_package(PkgConfig)
+  if(PkgConfig_FOUND)
+    pkg_check_modules(POPPLER_CPP IMPORTED_TARGET poppler-cpp)
+  endif()
+  if(POPPLER_CPP_FOUND)
+    target_link_libraries(cudaocr_lib PRIVATE PkgConfig::POPPLER_CPP)
+    target_compile_definitions(cudaocr_lib PRIVATE CUDAOCR_WITH_PDF=1)
+    message(STATUS "PDF input: poppler-cpp ${POPPLER_CPP_VERSION}")
+  else()
+    message(WARNING "poppler-cpp not found: PDF input disabled "
+                    "(sudo apt install libpoppler-cpp-dev, or -DCUDAOCR_WITH_PDF=OFF)")
+  endif()
+endif()
+
 # The ORT-backed recognizer is part of the library when ORT is enabled.
 if(CUDAOCR_WITH_ORT)
   target_sources(cudaocr_lib PRIVATE src/components/onnx_line_recognizer.cpp)
@@ -134,6 +153,7 @@ add_executable(unit_tests
   tests/unit/json_formatter_test.cpp
   tests/unit/hocr_formatter_test.cpp
   tests/unit/config_test.cpp
+  tests/unit/pdf_test.cpp
   tests/unit/words_from_ctc_test.cpp
   tests/unit/components_test.cpp
   tests/unit/device_test.cu
@@ -163,7 +183,8 @@ target_compile_definitions(unit_tests PRIVATE
   CUDAOCR_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/resources"
   CUDAOCR_SYNTH_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/synth"
   CUDAOCR_ONNX_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/onnx"
-  CUDAOCR_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/models")
+  CUDAOCR_MODEL_DIR="${CMAKE_CURRENT_SOURCE_DIR}/models"
+  CUDAOCR_PDF_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/pdf")
 set_target_properties(unit_tests PROPERTIES
   CUDA_SEPARABLE_COMPILATION ON
   RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
@@ -209,6 +230,9 @@ if(CUDAOCR_WITH_ORT)
            COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/cli_multipage_test.sh
                    $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval>)
   set_tests_properties(Cli.MultiPage PROPERTIES SKIP_RETURN_CODE 77)
+  add_test(NAME Cli.Pdf COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/scripts/cli_pdf_test.sh
+                                $<TARGET_FILE:cudaocr> $<TARGET_FILE:cudaocr-eval>)
+  set_tests_properties(Cli.Pdf PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 if(CUDAOCR_WITH_ORT)
   # Regression: exit-time heap corruption when a static Ort::Env was destroyed

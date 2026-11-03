@@ -69,7 +69,7 @@ Each stage is a **component** implementing a small interface (architecture.md §
 
 ### Stage 0 — CLI & I/O
 - `cudaocr <input...> [-o out] [--format txt|json|hocr] [--config file.toml] [--dump-stages dir] [--log-level ...] [--benchmark]`
-- Load PNG/JPEG/BMP/TGA via vendored stb_image; decode errors reported with path and reason.
+- Load PNG/JPEG/BMP/TGA/GIF/PNM via vendored stb_image and **PDF pages via poppler-cpp** (M4.7, optional; rendered at `--pdf-dpi`, default 300); decode errors reported with path and reason.
 - Directory or multiple inputs → one output per page (M4).
 - Exit codes: 0 success, 1 bad input, 2 GPU/runtime error, 3 no text found.
 
